@@ -67,10 +67,13 @@ if(WIN32)
   )
 
   set(QT_DEPENDS_DIR ${CMAKE_BINARY_DIR}/qt-depends)
+  file(MAKE_DIRECTORY "${QT_DEPENDS_DIR}")
+  file(WRITE "${QT_DEPENDS_DIR}/qt.conf" "[Paths]\nPrefix=.\nPlugins=plugins\n")
 
   add_custom_command(
     TARGET ${target} POST_BUILD
     COMMAND ${DEPLOYQT}
+      --force-openssl
       --no-compiler-runtime
       --no-system-d3d-compiler
       --no-opengl-sw
