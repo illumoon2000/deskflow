@@ -41,7 +41,7 @@ jobs:
           -DSKIP_BUILD_TESTS=ON
           ${{ steps.deps.outputs.vcpkg-cmake-config }}
       - name: Build
-        run: cmake --build build --parallel 4
+        run: cmake --build build --parallel 8
       - name: Test
         run: ctest --test-dir build/src/unittests --output-on-failure
       - name: Package MSI and portable ZIP

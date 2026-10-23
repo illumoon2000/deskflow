@@ -21,6 +21,7 @@ create_test(
 create_test(
   NAME FileSharingTests
   DEPENDS gui
+  LIBS app
   SOURCE FileSharingTests.cpp
   WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/gui"
 )
