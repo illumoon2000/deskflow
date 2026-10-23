@@ -5,6 +5,10 @@ on:
   push:
     branches: [installer-build, feature/file-sharing]
 
+concurrency:
+  group: installers-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 

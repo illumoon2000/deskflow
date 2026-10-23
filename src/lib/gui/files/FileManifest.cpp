@@ -4,6 +4,7 @@
  */
 #include "FileManifest.h"
 #include <QDir>
+#include <QDirIterator>
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -117,14 +118,14 @@ bool FileManifest::build(const QStringList &paths, qint64 limit, FileManifest &o
     draft.entries.append({relative, info.absoluteFilePath(), size, info.isDir()});
     draft.totalBytes += size;
     if (info.isDir()) {
-      const auto children =
-          QDir(info.absoluteFilePath())
-              .entryInfoList(
-                  QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden | QDir::System, QDir::DirsFirst | QDir::Name
-              );
-      for (const auto &child : children)
-        if (!append(child, relative + '/' + child.fileName()))
+      QDirIterator children(
+          info.absoluteFilePath(), QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden | QDir::System
+      );
+      while (children.hasNext()) {
+        children.next();
+        if (!append(children.fileInfo(), relative + '/' + children.fileName()))
           return false;
+      }
     }
     return true;
   };
