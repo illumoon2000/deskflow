@@ -531,6 +531,14 @@ Do you want to connect to the server?
         <translation>您当前的 TLS 密钥长度小于允许的最小值，将生成一个新的 2048 位密钥。</translation>
     </message>
     <message>
+        <source>File sharing…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>File sharing</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>invalid certificate, generating a new one</source>
         <translation type="unfinished">证书无效，正在生成新证书</translation>
     </message>
@@ -922,6 +930,62 @@ Additionally, check you are able to %1 the server config file: %2</source>
     <message>
         <source>Super</source>
         <translation type="unfinished">Super</translation>
+    </message>
+    <message>
+        <source>Invalid file list.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The transfer must contain 1 to 10,000 entries.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Invalid file entry.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unsafe, duplicate or invalid file name: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The transfer exceeds the configured size limit.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>A file&apos;s parent directory is missing.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Invalid root file name.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The transfer has no root files.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>A file is outside the selected roots.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot send a link, unreadable file or special file: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Too many files or a name unsupported on Windows/macOS: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The file list is too large. Send fewer files at a time.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot create the settings directory.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot securely save file sharing settings.</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -1391,6 +1455,339 @@ Enabling this setting will disable the server config GUI.</source>
     <message>
         <source>Encryption Disabled</source>
         <translation>加密已禁用</translation>
+    </message>
+</context>
+<context>
+    <name>deskflow::gui::files::FileSharingDialog</name>
+    <message>
+        <source>File Sharing</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Copy files or folders in Finder / Explorer, wait for transfer completion, then paste on the other computer.
+Both computers must run this Deskflow fork with file sharing enabled.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enable file sharing</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>This computer&apos;s LAN address</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>My address:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Receiving port:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Paste the other computer&apos;s pairing code</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Other computer:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Browse…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Receive files in:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source> MiB</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Maximum transfer:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Automatically send files copied in Finder / Explorer to the other computer</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Automatically accept requests using my pairing code</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Keep pairing codes private. Copy this computer&apos;s code to the other computer, and paste its code here.
+Incoming files require approval unless automatic acceptance is enabled. Original files are never moved or deleted.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Apply settings</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Copy my pairing code</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Reset my pairing code</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Reset pairing code?</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Old codes will stop accepting incoming transfers. Copy the new code to the other computer.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Pairing code reset. Copy the new code to the other computer.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Send files…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Send folder…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cancel transfers</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Files</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Direction</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Progress / status</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Copy received files for pasting</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Open received folder</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <translation type="unfinished">关闭</translation>
+    </message>
+    <message>
+        <source>Receive files in</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Apply settings and enter this computer&apos;s reachable address first.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Pairing code copied. Paste it only on the other computer.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Send files</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Send folder</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>File sharing could not start: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>File sharing ready. Drop files here to send them.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>File sharing is disabled.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Choose an absolute receiving folder and a valid peer pairing code for clipboard sharing.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot generate the TLS certificate.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Settings could not be saved securely. File sharing has been stopped.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ready on port %1. Exchange pairing codes on both computers.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Incoming files</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Sending</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Receiving</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Connecting / waiting for approval</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1 / %2 MiB (%3%)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Files received. The clipboard changed; use ‘Copy received files’ to prepare pasting.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Files received. Open File Sharing or paste in Finder / Explorer once ready.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Receive files?</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Receive %1 into %2?
+Total: %3 MiB
+The sender has this computer&apos;s pairing code.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Files are ready. Paste in Finder / Explorer on this computer.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>File sharing</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>deskflow::gui::files::FileTransferService</name>
+    <message>
+        <source>TLS support is unavailable.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot read the Deskflow TLS certificate.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The TLS certificate or private key is invalid.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enable file sharing first.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Another outgoing transfer is still running.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Paste the other computer&apos;s pairing code in File Sharing settings.</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>deskflow::gui::files::FileTransferSession</name>
+    <message>
+        <source>File transfer timed out.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The other computer disconnected before the transfer finished.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The other computer&apos;s fingerprint does not match its pairing code. Pair again.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot write to the transfer connection.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The other computer sent an oversized transfer message.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The source file changed or cannot be opened: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot create the receiving folder.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>There is not enough free space to receive these files.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot create a private transfer folder.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The other computer cancelled or declined the transfer.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The pairing code is invalid. Pair the computers again.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Invalid file data order or size.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The received file failed its SHA-256 integrity check.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot publish the received files.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unexpected file transfer message.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Waiting for integrity verification…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The source file changed during transfer.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot read the source file.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Transfer declined.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Transfer cancelled.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Transfer complete.</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>

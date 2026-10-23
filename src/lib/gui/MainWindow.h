@@ -29,6 +29,10 @@ class QAction;
 class QMenu;
 class QLocalServer;
 
+namespace deskflow::gui::files {
+class FileSharingDialog;
+}
+
 class DeskflowApplication;
 class LogDock;
 class StatusBar;
@@ -211,4 +215,6 @@ private:
   QStringList m_serverStartIPs;
   QString m_serverStartSuggestedIP;
   QUrl m_helpPath;
+  deskflow::gui::files::FileSharingDialog *m_fileSharing = nullptr;
+  QAction *m_actionFileSharing = nullptr;
 };

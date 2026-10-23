@@ -51,6 +51,7 @@ public:
     Text,        //!< Text format, UTF-8, newline is LF
     HTML,        //!< HTML format, HTML fragment, UTF-8, newline is LF
     Bitmap,      //!< Bitmap format, BMP 24/32bpp, BI_RGB
+    Files,       //!< File-copy marker; file payloads use the separate TLS file sharing channel
     TotalFormats //!< The number of clipboard formats supported
   };
 

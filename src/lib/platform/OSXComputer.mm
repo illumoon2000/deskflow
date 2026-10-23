@@ -835,6 +835,14 @@ void OSXComputer::leave()
 
 bool OSXComputer::setClipboard(ClipboardID, const IClipboard *src)
 {
+  // File payloads are handled by the GUI's TLS file channel. Do not clear the
+  // native file URLs prepared for Finder/Explorer when switching screens.
+  if (src && src->open(0)) {
+    const bool files = src->has(IClipboard::Format::Files);
+    src->close();
+    if (files)
+      return true;
+  }
   if (src != nullptr) {
     LOG_DEBUG("setting clipboard");
     Clipboard::copy(&m_pasteboard, src);

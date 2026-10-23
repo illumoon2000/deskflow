@@ -17,3 +17,18 @@ create_test(
   SOURCE VersionCheckerTests.cpp
   WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/gui"
 )
+
+create_test(
+  NAME FileSharingTests
+  DEPENDS gui
+  SOURCE FileSharingTests.cpp
+  WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/gui"
+)
+
+create_test(
+  NAME FileSharingUiTests
+  DEPENDS gui
+  SOURCE FileSharingUiTests.cpp
+  WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/gui"
+)
+set_tests_properties(FileSharingTests PROPERTIES TIMEOUT 90)

@@ -420,7 +420,7 @@ Do you want to connect to the server?
     </message>
     <message>
         <source>Close</source>
-        <translation type="unfinished">닫다</translation>
+        <translation>닫기</translation>
     </message>
 </context>
 <context>
@@ -529,6 +529,14 @@ Do you want to connect to the server?
     <message>
         <source>Your current TLS key is smaller than the minimum allowed size, A new key 2048-bit key will be generated.</source>
         <translation>현재 TLS 키 길이가 허용되는 최소 길이보다 짧습니다. 새 2048비트 키를 생성합니다.</translation>
+    </message>
+    <message>
+        <source>File sharing…</source>
+        <translation>파일 공유…</translation>
+    </message>
+    <message>
+        <source>File sharing</source>
+        <translation>파일 공유</translation>
     </message>
     <message>
         <source>invalid certificate, generating a new one</source>
@@ -920,6 +928,62 @@ Additionally, check you are able to %1 the server config file: %2</source>
     <message>
         <source>Super</source>
         <translation type="unfinished">Super</translation>
+    </message>
+    <message>
+        <source>Invalid file list.</source>
+        <translation>파일 목록이 올바르지 않습니다.</translation>
+    </message>
+    <message>
+        <source>The transfer must contain 1 to 10,000 entries.</source>
+        <translation>한 번에 1~10,000개 항목을 전송할 수 있습니다.</translation>
+    </message>
+    <message>
+        <source>Invalid file entry.</source>
+        <translation>파일 항목이 올바르지 않습니다.</translation>
+    </message>
+    <message>
+        <source>Unsafe, duplicate or invalid file name: %1</source>
+        <translation>안전하지 않거나 중복된 파일 이름입니다: %1</translation>
+    </message>
+    <message>
+        <source>The transfer exceeds the configured size limit.</source>
+        <translation>설정한 최대 전송 용량을 넘었습니다.</translation>
+    </message>
+    <message>
+        <source>A file&apos;s parent directory is missing.</source>
+        <translation>파일의 상위 폴더가 없습니다.</translation>
+    </message>
+    <message>
+        <source>Invalid root file name.</source>
+        <translation>최상위 파일 이름이 올바르지 않습니다.</translation>
+    </message>
+    <message>
+        <source>The transfer has no root files.</source>
+        <translation>전송할 최상위 파일이 없습니다.</translation>
+    </message>
+    <message>
+        <source>A file is outside the selected roots.</source>
+        <translation>선택한 최상위 폴더 밖의 파일이 포함돼 있습니다.</translation>
+    </message>
+    <message>
+        <source>Cannot send a link, unreadable file or special file: %1</source>
+        <translation>링크, 읽을 수 없는 파일 또는 특수 파일은 전송할 수 없습니다: %1</translation>
+    </message>
+    <message>
+        <source>Too many files or a name unsupported on Windows/macOS: %1</source>
+        <translation>파일이 너무 많거나 Windows·macOS에서 지원하지 않는 이름입니다: %1</translation>
+    </message>
+    <message>
+        <source>The file list is too large. Send fewer files at a time.</source>
+        <translation>파일 목록이 너무 큽니다. 나눠서 전송하세요.</translation>
+    </message>
+    <message>
+        <source>Cannot create the settings directory.</source>
+        <translation>설정 폴더를 만들 수 없습니다.</translation>
+    </message>
+    <message>
+        <source>Cannot securely save file sharing settings.</source>
+        <translation>파일 공유 설정을 안전하게 저장할 수 없습니다.</translation>
     </message>
 </context>
 <context>
@@ -1389,6 +1453,343 @@ Enabling this setting will disable the server config GUI.</source>
     <message>
         <source>Encryption Disabled</source>
         <translation>암호화 사용 안 함</translation>
+    </message>
+</context>
+<context>
+    <name>deskflow::gui::files::FileSharingDialog</name>
+    <message>
+        <source>File Sharing</source>
+        <translation>파일 공유</translation>
+    </message>
+    <message>
+        <source>Copy files or folders in Finder / Explorer, wait for transfer completion, then paste on the other computer.
+Both computers must run this Deskflow fork with file sharing enabled.</source>
+        <translation>Finder·탐색기에서 파일이나 폴더를 복사하고, 전송 완료 후 상대 컴퓨터에서 붙여넣으세요.
+두 컴퓨터 모두 이 Deskflow 포크에서 파일 공유를 켜야 합니다.</translation>
+    </message>
+    <message>
+        <source>Enable file sharing</source>
+        <translation>파일 공유 사용</translation>
+    </message>
+    <message>
+        <source>This computer&apos;s LAN address</source>
+        <translation>이 컴퓨터의 내부 네트워크 주소</translation>
+    </message>
+    <message>
+        <source>My address:</source>
+        <translation>내 주소:</translation>
+    </message>
+    <message>
+        <source>Receiving port:</source>
+        <translation>수신 포트:</translation>
+    </message>
+    <message>
+        <source>Paste the other computer&apos;s pairing code</source>
+        <translation>상대 컴퓨터의 연결 코드를 붙여넣으세요</translation>
+    </message>
+    <message>
+        <source>Other computer:</source>
+        <translation>상대 컴퓨터:</translation>
+    </message>
+    <message>
+        <source>Browse…</source>
+        <translation>찾아보기…</translation>
+    </message>
+    <message>
+        <source>Receive files in:</source>
+        <translation>수신 폴더:</translation>
+    </message>
+    <message>
+        <source> MiB</source>
+        <translation> MiB</translation>
+    </message>
+    <message>
+        <source>Maximum transfer:</source>
+        <translation>최대 전송 용량:</translation>
+    </message>
+    <message>
+        <source>Automatically send files copied in Finder / Explorer to the other computer</source>
+        <translation>Finder·탐색기에서 복사한 파일을 상대 컴퓨터로 자동 전송</translation>
+    </message>
+    <message>
+        <source>Automatically accept requests using my pairing code</source>
+        <translation>내 연결 코드를 사용하는 수신 요청을 자동 승인</translation>
+    </message>
+    <message>
+        <source>Keep pairing codes private. Copy this computer&apos;s code to the other computer, and paste its code here.
+Incoming files require approval unless automatic acceptance is enabled. Original files are never moved or deleted.</source>
+        <translation>연결 코드는 상대 컴퓨터에만 전달하세요. 내 코드를 상대에게 복사하고 상대 코드는 여기에 붙여넣으세요.
+자동 승인을 켜지 않으면 파일 수신마다 확인합니다. 원본 파일은 이동하거나 삭제하지 않습니다.</translation>
+    </message>
+    <message>
+        <source>Apply settings</source>
+        <translation>설정 적용</translation>
+    </message>
+    <message>
+        <source>Copy my pairing code</source>
+        <translation>내 연결 코드 복사</translation>
+    </message>
+    <message>
+        <source>Reset my pairing code</source>
+        <translation>내 연결 코드 초기화</translation>
+    </message>
+    <message>
+        <source>Reset pairing code?</source>
+        <translation>연결 코드를 초기화하시겠습니까?</translation>
+    </message>
+    <message>
+        <source>Old codes will stop accepting incoming transfers. Copy the new code to the other computer.</source>
+        <translation>기존 코드로는 파일을 받을 수 없게 됩니다. 새 코드를 상대 컴퓨터에 전달하세요.</translation>
+    </message>
+    <message>
+        <source>Pairing code reset. Copy the new code to the other computer.</source>
+        <translation>연결 코드를 초기화했습니다. 새 코드를 상대 컴퓨터에 전달하세요.</translation>
+    </message>
+    <message>
+        <source>Send files…</source>
+        <translation>파일 보내기…</translation>
+    </message>
+    <message>
+        <source>Send folder…</source>
+        <translation>폴더 보내기…</translation>
+    </message>
+    <message>
+        <source>Cancel transfers</source>
+        <translation>전송 취소</translation>
+    </message>
+    <message>
+        <source>Files</source>
+        <translation>파일</translation>
+    </message>
+    <message>
+        <source>Direction</source>
+        <translation>방향</translation>
+    </message>
+    <message>
+        <source>Progress / status</source>
+        <translation>진행 / 상태</translation>
+    </message>
+    <message>
+        <source>Copy received files for pasting</source>
+        <translation>받은 파일을 클립보드에 복사</translation>
+    </message>
+    <message>
+        <source>Open received folder</source>
+        <translation>수신 폴더 열기</translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <translation>닫기</translation>
+    </message>
+    <message>
+        <source>Receive files in</source>
+        <translation>수신 폴더 선택</translation>
+    </message>
+    <message>
+        <source>Apply settings and enter this computer&apos;s reachable address first.</source>
+        <translation>설정을 적용한 뒤 상대 컴퓨터에서 접속할 수 있는 내 주소를 입력하세요.</translation>
+    </message>
+    <message>
+        <source>Pairing code copied. Paste it only on the other computer.</source>
+        <translation>연결 코드를 복사했습니다. 상대 컴퓨터에만 붙여넣으세요.</translation>
+    </message>
+    <message>
+        <source>Send files</source>
+        <translation>보낼 파일 선택</translation>
+    </message>
+    <message>
+        <source>Send folder</source>
+        <translation>보낼 폴더 선택</translation>
+    </message>
+    <message>
+        <source>File sharing could not start: %1</source>
+        <translation>파일 공유를 시작하지 못했습니다: %1</translation>
+    </message>
+    <message>
+        <source>File sharing ready. Drop files here to send them.</source>
+        <translation>파일 공유가 준비됐습니다. 여기에 파일을 끌어 놓아 보내세요.</translation>
+    </message>
+    <message>
+        <source>File sharing is disabled.</source>
+        <translation>파일 공유가 꺼져 있습니다.</translation>
+    </message>
+    <message>
+        <source>Choose an absolute receiving folder and a valid peer pairing code for clipboard sharing.</source>
+        <translation>수신 폴더의 전체 경로와 클립보드 공유에 사용할 상대 연결 코드를 확인하세요.</translation>
+    </message>
+    <message>
+        <source>Cannot generate the TLS certificate.</source>
+        <translation>TLS 인증서를 만들지 못했습니다.</translation>
+    </message>
+    <message>
+        <source>Settings could not be saved securely. File sharing has been stopped.</source>
+        <translation>설정을 안전하게 저장하지 못해 파일 공유를 중지했습니다.</translation>
+    </message>
+    <message>
+        <source>Ready on port %1. Exchange pairing codes on both computers.</source>
+        <translation>%1번 포트에서 대기 중입니다. 두 컴퓨터의 연결 코드를 서로 교환하세요.</translation>
+    </message>
+    <message>
+        <source>Incoming files</source>
+        <translation>수신 파일</translation>
+    </message>
+    <message>
+        <source>Sending</source>
+        <translation>보내는 중</translation>
+    </message>
+    <message>
+        <source>Receiving</source>
+        <translation>받는 중</translation>
+    </message>
+    <message>
+        <source>Connecting / waiting for approval</source>
+        <translation>연결 / 수신 승인 대기</translation>
+    </message>
+    <message>
+        <source>%1 / %2 MiB (%3%)</source>
+        <translation>%1 / %2 MiB (%3%)</translation>
+    </message>
+    <message>
+        <source>Files received. The clipboard changed; use ‘Copy received files’ to prepare pasting.</source>
+        <translation>파일을 받았습니다. 클립보드가 바뀌었으므로 ‘받은 파일을 클립보드에 복사’를 누른 뒤 붙여넣으세요.</translation>
+    </message>
+    <message>
+        <source>Files received. Open File Sharing or paste in Finder / Explorer once ready.</source>
+        <translation>파일을 받았습니다. 파일 공유 창을 열거나 준비가 끝나면 Finder·탐색기에서 붙여넣으세요.</translation>
+    </message>
+    <message>
+        <source>Receive files?</source>
+        <translation>파일을 받으시겠습니까?</translation>
+    </message>
+    <message>
+        <source>Receive %1 into %2?
+Total: %3 MiB
+The sender has this computer&apos;s pairing code.</source>
+        <translation>%1을(를) %2에 받으시겠습니까?
+총 용량: %3 MiB
+보낸 사람은 이 컴퓨터의 연결 코드를 가지고 있습니다.</translation>
+    </message>
+    <message>
+        <source>Files are ready. Paste in Finder / Explorer on this computer.</source>
+        <translation>파일이 준비됐습니다. 이 컴퓨터의 Finder·탐색기에서 붙여넣으세요.</translation>
+    </message>
+    <message>
+        <source>File sharing</source>
+        <translation>파일 공유</translation>
+    </message>
+</context>
+<context>
+    <name>deskflow::gui::files::FileTransferService</name>
+    <message>
+        <source>TLS support is unavailable.</source>
+        <translation>TLS를 사용할 수 없습니다.</translation>
+    </message>
+    <message>
+        <source>Cannot read the Deskflow TLS certificate.</source>
+        <translation>Deskflow TLS 인증서를 읽을 수 없습니다.</translation>
+    </message>
+    <message>
+        <source>The TLS certificate or private key is invalid.</source>
+        <translation>TLS 인증서나 개인 키가 올바르지 않습니다.</translation>
+    </message>
+    <message>
+        <source>Enable file sharing first.</source>
+        <translation>먼저 파일 공유를 켜세요.</translation>
+    </message>
+    <message>
+        <source>Another outgoing transfer is still running.</source>
+        <translation>다른 파일 전송이 진행 중입니다.</translation>
+    </message>
+    <message>
+        <source>Paste the other computer&apos;s pairing code in File Sharing settings.</source>
+        <translation>파일 공유 설정에 상대 컴퓨터의 연결 코드를 붙여넣으세요.</translation>
+    </message>
+</context>
+<context>
+    <name>deskflow::gui::files::FileTransferSession</name>
+    <message>
+        <source>File transfer timed out.</source>
+        <translation>파일 전송 대기 시간이 지났습니다.</translation>
+    </message>
+    <message>
+        <source>The other computer disconnected before the transfer finished.</source>
+        <translation>전송이 끝나기 전에 상대 컴퓨터의 연결이 끊어졌습니다.</translation>
+    </message>
+    <message>
+        <source>The other computer&apos;s fingerprint does not match its pairing code. Pair again.</source>
+        <translation>상대 컴퓨터의 인증서 지문이 연결 코드와 다릅니다. 연결 코드를 다시 교환하세요.</translation>
+    </message>
+    <message>
+        <source>Cannot write to the transfer connection.</source>
+        <translation>전송 연결에 데이터를 쓸 수 없습니다.</translation>
+    </message>
+    <message>
+        <source>The other computer sent an oversized transfer message.</source>
+        <translation>상대 컴퓨터가 허용 크기를 넘는 전송 메시지를 보냈습니다.</translation>
+    </message>
+    <message>
+        <source>The source file changed or cannot be opened: %1</source>
+        <translation>원본 파일이 바뀌었거나 열 수 없습니다: %1</translation>
+    </message>
+    <message>
+        <source>Cannot create the receiving folder.</source>
+        <translation>수신 폴더를 만들 수 없습니다.</translation>
+    </message>
+    <message>
+        <source>There is not enough free space to receive these files.</source>
+        <translation>파일을 받을 디스크 공간이 부족합니다.</translation>
+    </message>
+    <message>
+        <source>Cannot create a private transfer folder.</source>
+        <translation>전송용 임시 폴더를 만들 수 없습니다.</translation>
+    </message>
+    <message>
+        <source>The other computer cancelled or declined the transfer.</source>
+        <translation>상대 컴퓨터가 전송을 취소하거나 거절했습니다.</translation>
+    </message>
+    <message>
+        <source>The pairing code is invalid. Pair the computers again.</source>
+        <translation>연결 코드가 올바르지 않습니다. 코드를 다시 교환하세요.</translation>
+    </message>
+    <message>
+        <source>Invalid file data order or size.</source>
+        <translation>파일 데이터의 순서나 크기가 올바르지 않습니다.</translation>
+    </message>
+    <message>
+        <source>The received file failed its SHA-256 integrity check.</source>
+        <translation>받은 파일의 SHA-256 무결성 검사에 실패했습니다.</translation>
+    </message>
+    <message>
+        <source>Cannot publish the received files.</source>
+        <translation>수신이 끝난 파일을 저장할 수 없습니다.</translation>
+    </message>
+    <message>
+        <source>Unexpected file transfer message.</source>
+        <translation>예상하지 못한 파일 전송 메시지입니다.</translation>
+    </message>
+    <message>
+        <source>Waiting for integrity verification…</source>
+        <translation>파일 무결성 확인 대기…</translation>
+    </message>
+    <message>
+        <source>The source file changed during transfer.</source>
+        <translation>전송 중 원본 파일이 바뀌었습니다.</translation>
+    </message>
+    <message>
+        <source>Cannot read the source file.</source>
+        <translation>원본 파일을 읽을 수 없습니다.</translation>
+    </message>
+    <message>
+        <source>Transfer declined.</source>
+        <translation>전송을 거절했습니다.</translation>
+    </message>
+    <message>
+        <source>Transfer cancelled.</source>
+        <translation>전송을 취소했습니다.</translation>
+    </message>
+    <message>
+        <source>Transfer complete.</source>
+        <translation>전송을 완료했습니다.</translation>
     </message>
 </context>
 <context>

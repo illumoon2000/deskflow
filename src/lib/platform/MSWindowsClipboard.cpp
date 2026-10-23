@@ -154,6 +154,8 @@ IClipboard::Time MSWindowsClipboard::getTime() const
 
 bool MSWindowsClipboard::has(Format format) const
 {
+  if (format == IClipboard::Format::Files)
+    return IsClipboardFormatAvailable(CF_HDROP);
   for (ConverterList::const_iterator index = m_converters.begin(); index != m_converters.end(); ++index) {
     IMSWindowsClipboardConverter *converter = *index;
     if (converter->getFormat() == format) {
@@ -167,6 +169,8 @@ bool MSWindowsClipboard::has(Format format) const
 
 std::string MSWindowsClipboard::get(Format format) const
 {
+  if (format == IClipboard::Format::Files)
+    return "file-sharing-v1";
   // find the converter for the first clipboard format we can handle
   IMSWindowsClipboardConverter *converter = nullptr;
   for (ConverterList::const_iterator index = m_converters.begin(); index != m_converters.end(); ++index) {

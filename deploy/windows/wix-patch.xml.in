@@ -25,6 +25,11 @@
     <firewall:FirewallException Id="ClientFirewallException" Name="Deskflow Client" Program="[INSTALL_ROOT]deskflow-core.exe" Scope="any"/>
   </CPackWiXFragment>
 
+  <CPackWiXFragment Id="CM_CP_deskflow.exe">
+    <firewall:FirewallException Id="FileSharingFirewallException" Name="Deskflow File Sharing"
+      Program="[INSTALL_ROOT]deskflow.exe" Port="24801" Protocol="tcp" Scope="localSubnet" Profile="private"/>
+  </CPackWiXFragment>
+
   <CPackWiXFragment Id="#PRODUCT">
     <Property Id="VC_REDIST_INSTALLED">
       <RegistrySearch

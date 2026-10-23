@@ -10,6 +10,7 @@ if(APPLE)
   set (platform_sources
     OSXHelpers.h
     OSXHelpers.mm
+    files/FileClipboard.mm
   )
 endif()
 
@@ -33,6 +34,18 @@ add_library(${target} STATIC
   TlsUtility.h
   VersionChecker.cpp
   VersionChecker.h
+  files/FileManifest.cpp
+  files/FileManifest.h
+  files/FileSharingSettings.cpp
+  files/FileSharingSettings.h
+  files/FileTransferSession.cpp
+  files/FileTransferSession.h
+  files/FileTransferService.cpp
+  files/FileTransferService.h
+  files/FileSharingDialog.cpp
+  files/FileSharingDialog.h
+  files/FileClipboard.cpp
+  files/FileClipboard.h
   config/ComputerConfig.h
   config/Computer.cpp
   config/Computer.h

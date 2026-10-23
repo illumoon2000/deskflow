@@ -138,6 +138,10 @@ bool OSXClipboard::has(Format format) const
 
   PasteboardItemID item;
   PasteboardGetItemIdentifier(m_pboard, (CFIndex)1, &item);
+  if (format == IClipboard::Format::Files) {
+    PasteboardFlavorFlags flags;
+    return PasteboardGetItemFlavorFlags(m_pboard, item, CFSTR("public.file-url"), &flags) == noErr;
+  }
 
   for (ConverterList::const_iterator index = m_converters.begin(); index != m_converters.end(); ++index) {
     IOSXClipboardConverter *converter = *index;
@@ -158,6 +162,8 @@ bool OSXClipboard::has(Format format) const
 
 std::string OSXClipboard::get(Format format) const
 {
+  if (format == IClipboard::Format::Files)
+    return "file-sharing-v1";
   CFStringRef type;
   PasteboardItemID item;
   std::string result;

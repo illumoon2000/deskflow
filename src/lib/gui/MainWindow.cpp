@@ -27,6 +27,7 @@
 #include "gui/Messages.h"
 #include "gui/TlsUtility.h"
 #include "gui/core/CoreProcess.h"
+#include "gui/files/FileSharingDialog.h"
 #include "gui/ipc/DaemonIpcClient.h"
 #include "gui/widgets/LogDock.h"
 #include "net/FingerprintDatabase.h"
@@ -153,6 +154,20 @@ MainWindow::MainWindow()
       m_fingerprint = {QCryptographicHash::Sha256, TlsUtility::certFingerprint()};
     }
   }
+
+  m_fileSharing = new files::FileSharingDialog(this);
+  m_actionFileSharing = new QAction(tr("File sharing…"), this);
+  m_actionFileSharing->setObjectName("openFileSharing");
+  m_menuFile->insertAction(m_actionQuit, m_actionFileSharing);
+  m_trayIcon->contextMenu()->insertAction(m_actionTrayQuit, m_actionFileSharing);
+  connect(m_actionFileSharing, &QAction::triggered, this, [this] {
+    m_fileSharing->show();
+    m_fileSharing->raise();
+    m_fileSharing->activateWindow();
+  });
+  connect(m_fileSharing, &files::FileSharingDialog::notification, this, [this](const QString &text) {
+    m_trayIcon->showMessage(tr("File sharing"), text, QSystemTrayIcon::Information, 5000);
+  });
 
   applyConfig();
   m_statusBar->setSecurityIcon(TlsUtility::isEnabled());
