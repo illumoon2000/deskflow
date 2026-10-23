@@ -1,0 +1,53 @@
+name: Build installers
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [installer-build]
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: Windows x64 installer
+    runs-on: windows-2022
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: TheMrMilchmann/setup-msvc-dev@v4
+        with:
+          arch: amd64
+          spectre: true
+      - name: Install dependencies
+        id: deps
+        uses: ./.github/actions/install-dependencies
+        with:
+          qt-version: '6.12.0'
+          vcpkg-triplet: x64-windows-release
+      - name: Configure
+        shell: pwsh
+        run: >-
+          cmake -S . -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DBUILD_INSTALLER=ON
+          -DBUILD_TESTS=ON
+          -DSKIP_BUILD_TESTS=ON
+          ${{ steps.deps.outputs.vcpkg-cmake-config }}
+      - name: Build
+        run: cmake --build build --parallel 4
+      - name: Test
+        run: ctest --test-dir build/src/unittests --output-on-failure
+      - name: Package MSI and portable ZIP
+        run: cpack --config build/CPackConfig.cmake -B dist
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: deskflow-windows-x64
+          path: |
+            dist/*.msi
+            dist/*.zip
+          if-no-files-found: error
+          retention-days: 14
