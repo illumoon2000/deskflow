@@ -18,6 +18,22 @@ public:
   ~FileTransferService() override;
   bool configure(const FileSharingSettings &settings, const QString &certificatePath, QString &error);
   FileTransferSession *sendFiles(const QStringList &paths, QString &error);
+  FileTransferSession *requestFiles(
+      const QUrl &peer, const QByteArray &key, const QByteArray &fingerprint, quint64 clipboardSequence, qint64 limit,
+      QString &error
+  );
+  void setPullEnabled(bool enabled)
+  {
+    m_pullEnabled = enabled;
+    if (!enabled)
+      clearPullOffer();
+  }
+  void setLimit(qint64 limit)
+  {
+    m_settings.limit = limit;
+  }
+  void setPullOffer(const QByteArray &key, quint64 sequence);
+  void clearPullOffer();
   QString pairingCode(const QString &host) const;
   bool sending() const
   {
@@ -25,7 +41,7 @@ public:
   }
   bool receiving() const
   {
-    return !m_incoming.isNull();
+    return !m_incoming.isNull() || !m_pulling.isNull();
   }
   void cancelAll();
   quint16 port() const
@@ -44,5 +60,9 @@ private:
   QSet<QSslSocket *> m_handshakes;
   QPointer<FileTransferSession> m_outgoing;
   QPointer<FileTransferSession> m_incoming;
+  QPointer<FileTransferSession> m_pulling;
+  bool m_pullEnabled = false;
+  QByteArray m_pullOfferKey;
+  quint64 m_pullOfferSequence = 0;
 };
 } // namespace deskflow::gui::files

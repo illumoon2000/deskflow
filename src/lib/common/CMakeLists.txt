@@ -15,6 +15,8 @@ add_library(common STATIC
   Coordinate.h
   Enums.h
   ExitCodes.h
+  FileClipboardBridge.cpp
+  FileClipboardBridge.h
   Hotkey.cpp
   Hotkey.h
   I18N.h
@@ -35,7 +37,10 @@ add_library(common STATIC
   ${CMAKE_CURRENT_BINARY_DIR}/VersionInfo.h
 )
 
-target_link_libraries(common PUBLIC Qt6::Core)
+target_link_libraries(common PUBLIC Qt6::Core Qt6::Network)
+if(WIN32)
+  target_link_libraries(common PRIVATE advapi32 shell32 ole32 wtsapi32 uuid)
+endif()
 
 target_include_directories(common
   PUBLIC

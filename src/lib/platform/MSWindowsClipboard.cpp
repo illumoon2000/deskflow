@@ -9,6 +9,7 @@
 #include "platform/MSWindowsClipboard.h"
 
 #include "base/Log.h"
+#include "common/FileClipboardBridge.h"
 #include "platform/MSWindowsClipboardBitmapConverter.h"
 #include "platform/MSWindowsClipboardFacade.h"
 #include "platform/MSWindowsClipboardHTMLConverter.h"
@@ -154,8 +155,18 @@ IClipboard::Time MSWindowsClipboard::getTime() const
 
 bool MSWindowsClipboard::has(Format format) const
 {
+  const auto sequence = quint64(GetClipboardSequenceNumber());
+  if (deskflow::files::FileClipboardBridge::isNativePublicationInProgress() ||
+      deskflow::files::FileClipboardBridge::isSuppressedSequence(sequence))
+    return false;
+  QJsonObject incoming;
+  if (deskflow::files::FileClipboardBridge::readIncomingOffer(incoming))
+    return false;
+  if (IsClipboardFormatAvailable(CF_HDROP))
+    return format == IClipboard::Format::Files && sequence &&
+           deskflow::files::FileClipboardBridge::sourceEndpointReady();
   if (format == IClipboard::Format::Files)
-    return IsClipboardFormatAvailable(CF_HDROP);
+    return false;
   for (ConverterList::const_iterator index = m_converters.begin(); index != m_converters.end(); ++index) {
     IMSWindowsClipboardConverter *converter = *index;
     if (converter->getFormat() == format) {
@@ -170,7 +181,8 @@ bool MSWindowsClipboard::has(Format format) const
 std::string MSWindowsClipboard::get(Format format) const
 {
   if (format == IClipboard::Format::Files)
-    return "file-sharing-v1";
+    return has(format) ? deskflow::files::FileClipboardBridge::clipboardPayload(GetClipboardSequenceNumber())
+                       : std::string();
   // find the converter for the first clipboard format we can handle
   IMSWindowsClipboardConverter *converter = nullptr;
   for (ConverterList::const_iterator index = m_converters.begin(); index != m_converters.end(); ++index) {

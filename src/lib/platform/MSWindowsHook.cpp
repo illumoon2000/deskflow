@@ -10,6 +10,7 @@
 #include "base/Log.h"
 #include "deskflow/DisplayException.h"
 
+#include <atomic>
 #include <cstring>
 #include <mutex>
 
@@ -44,6 +45,11 @@ static std::mutex g_keyStateMutex;
 static DWORD g_hookThread = 0;
 static bool g_fakeServerInput = false;
 static BOOL g_isPrimary = TRUE;
+static std::atomic<bool> g_filePastePending{false};
+static std::atomic<bool> g_filePasteSuppressV{false};
+static std::atomic<bool> g_filePasteRequestActive{false};
+static std::atomic<uint32_t> g_filePasteInteractionSerial{0};
+static std::atomic<uint32_t> g_filePasteStartSerial{0};
 
 MSWindowsHook::~MSWindowsHook()
 {
@@ -114,6 +120,8 @@ int MSWindowsHook::init(DWORD threadID)
 
 int MSWindowsHook::cleanup()
 {
+  setFilePastePending(false);
+  clearFilePasteRequest();
   if (g_processID == GetCurrentProcessId()) {
     g_threadID = 0;
   }
@@ -147,6 +155,31 @@ void MSWindowsHook::setMode(EHookMode mode)
     return;
   }
   g_mode = mode;
+}
+
+void MSWindowsHook::setFilePastePending(bool pending)
+{
+  g_filePastePending.store(pending);
+}
+
+bool MSWindowsHook::isFilePasteVDown()
+{
+  return g_filePasteSuppressV.load();
+}
+
+uint32_t MSWindowsHook::filePasteInteractionSerial()
+{
+  return g_filePasteInteractionSerial.load();
+}
+
+uint32_t MSWindowsHook::filePasteStartSerial()
+{
+  return g_filePasteStartSerial.load();
+}
+
+void MSWindowsHook::clearFilePasteRequest()
+{
+  g_filePasteRequestActive.store(false);
 }
 
 bool MSWindowsHook::getPhysicalKeyState(BYTE keys[MSWindowsHook::kVirtualKeyCount])
@@ -483,8 +516,47 @@ static LRESULT CALLBACK keyboardLLHook(int code, WPARAM wParam, LPARAM lParam)
     KBDLLHOOKSTRUCT *info = reinterpret_cast<KBDLLHOOKSTRUCT *>(lParam);
 
     bool const injected = info->flags & LLKHF_INJECTED;
+    if (injected && info->dwExtraInfo == MSWindowsHook::kFilePasteReplayTag) {
+      return CallNextHookEx(g_keyboardLL, code, wParam, lParam);
+    }
     if (!g_isPrimary && injected) {
       return CallNextHookEx(g_keyboardLL, code, wParam, lParam);
+    }
+
+    if (g_isPrimary && !injected) {
+      const bool up = (info->flags & LLKHF_UP) != 0;
+      if (info->vkCode == VK_V && up && g_filePasteSuppressV.exchange(false)) {
+        return 1;
+      }
+      if (info->vkCode == VK_V && !up && g_filePasteSuppressV.load()) {
+        return 1;
+      }
+      if (info->vkCode == VK_V && !up && g_mode == kHOOK_WATCH_JUMP_ZONE && !g_fakeServerInput &&
+          g_filePastePending.load() && (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0 &&
+          (GetAsyncKeyState(VK_MENU) & 0x8000) == 0 && (GetAsyncKeyState(VK_SHIFT) & 0x8000) == 0 &&
+          (GetAsyncKeyState(VK_LWIN) & 0x8000) == 0 && (GetAsyncKeyState(VK_RWIN) & 0x8000) == 0) {
+        if (!g_filePasteRequestActive.exchange(true)) {
+          GUITHREADINFO focus{};
+          focus.cbSize = sizeof(focus);
+          if (!GetGUIThreadInfo(0, &focus))
+            focus.hwndFocus = nullptr;
+          g_filePasteStartSerial.store(g_filePasteInteractionSerial.load());
+          if (!PostThreadMessage(
+                  g_threadID, DESKFLOW_MSG_FILE_PASTE, reinterpret_cast<WPARAM>(GetForegroundWindow()),
+                  reinterpret_cast<LPARAM>(focus.hwndFocus)
+              )) {
+            g_filePasteRequestActive.store(false);
+          }
+          g_filePasteSuppressV.store(true);
+          return 1;
+        } else {
+          g_filePasteSuppressV.store(true);
+          return 1;
+        }
+      }
+      if (!up && g_filePasteRequestActive.load()) {
+        g_filePasteInteractionSerial.fetch_add(1);
+      }
     }
 
     WPARAM wParam = info->vkCode;
@@ -634,6 +706,17 @@ static LRESULT CALLBACK mouseLLHook(int code, WPARAM wParam, LPARAM lParam)
       return CallNextHookEx(g_mouseLL, code, wParam, lParam);
     }
 
+    if (g_isPrimary && !injected && g_filePasteRequestActive.load()) {
+      switch (wParam) {
+      case WM_LBUTTONDOWN:
+      case WM_RBUTTONDOWN:
+      case WM_MBUTTONDOWN:
+      case WM_XBUTTONDOWN:
+        g_filePasteInteractionSerial.fetch_add(1);
+        break;
+      }
+    }
+
     int32_t x = static_cast<int32_t>(info->pt.x);
     int32_t y = static_cast<int32_t>(info->pt.y);
     int32_t w = static_cast<int16_t>(HIWORD(info->mouseData));
@@ -665,6 +748,8 @@ EHookResult MSWindowsHook::install()
 
   // reset fake input flag
   g_fakeServerInput = false;
+  g_filePasteSuppressV.store(false);
+  g_filePasteRequestActive.store(false);
 
   // install low-level hooks.  we require that they both get installed.
   g_mouseLL = SetWindowsHookEx(WH_MOUSE_LL, &mouseLLHook, nullptr, 0);
@@ -703,6 +788,8 @@ EHookResult MSWindowsHook::install()
 
 int MSWindowsHook::uninstall()
 {
+  g_filePasteSuppressV.store(false);
+  g_filePasteRequestActive.store(false);
   // discard old dead keys
   g_deadVirtKey = 0;
   g_deadLParam = 0;

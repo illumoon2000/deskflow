@@ -16,6 +16,7 @@
 #include "base/TMethodJob.h"
 #include "client/Client.h"
 #include "common/Constants.h"
+#include "common/FileClipboardBridge.h"
 #include "common/Settings.h"
 #include "deskflow/App.h"
 #include "deskflow/ClientApp.h"
@@ -28,8 +29,10 @@
 #include "platform/MSWindowsKeyState.h"
 #include "platform/MSWindowsScreenSaver.h"
 
+#include <QJsonObject>
 #include <Shlobj.h>
 #include <algorithm>
+#include <chrono>
 #include <comutil.h>
 #include <string.h>
 
@@ -204,6 +207,7 @@ void MSWindowsComputer::disable()
 {
   LOG_DEBUG("disabling %s computer", m_isPrimary ? "primary" : "secondary");
   m_isEnabled = false;
+  finishLocalFilePaste(false, "computer disabled");
 
   // stop tracking the active desk
   m_desks->disable();
@@ -279,6 +283,7 @@ bool MSWindowsComputer::canLeave()
 
 void MSWindowsComputer::leave()
 {
+  finishLocalFilePaste(false, "left primary computer");
   // get keyboard layout of foreground window.  we'll use this
   // keyboard layout for translating keys sent to clients.
   m_keyLayout = AppUtilWindows::instance().getCurrentKeyboardLayout();
@@ -320,14 +325,37 @@ void MSWindowsComputer::leave()
 
 bool MSWindowsComputer::setClipboard(ClipboardID, const IClipboard *src)
 {
-  // File payloads are handled by the GUI's TLS file channel. Do not clear the
-  // native file URLs prepared for Finder/Explorer when switching screens.
   if (src && src->open(0)) {
     const bool files = src->has(IClipboard::Format::Files);
+    const auto payload = files ? src->get(IClipboard::Format::Files) : std::string();
     src->close();
-    if (files)
-      return true;
+    if (files) {
+      if (m_isPrimary)
+        m_hook.setFilePastePending(true);
+      if (deskflow::files::FileClipboardBridge::writeIncomingOffer(payload)) {
+        if (m_isPrimary)
+          m_filePasteOfferClipboardSequence = GetClipboardSequenceNumber();
+        m_clipboardSequenceNumber = GetClipboardSequenceNumber();
+        return true;
+      }
+      if (m_isPrimary) {
+        m_hook.setFilePastePending(false);
+        finishLocalFilePaste(false, "invalid file offer");
+        m_filePasteOfferClipboardSequence = 0;
+      }
+      deskflow::files::FileClipboardBridge::clearIncomingOffer();
+      deskflow::files::FileClipboardBridge::clearIncomingStatus();
+      // Old versions sent only a marker. They have no transferable offer.
+      return payload == "file-sharing-v1";
+    }
   }
+  if (m_isPrimary) {
+    m_hook.setFilePastePending(false);
+    finishLocalFilePaste(false, "clipboard changed");
+    m_filePasteOfferClipboardSequence = 0;
+  }
+  deskflow::files::FileClipboardBridge::clearIncomingOffer();
+  deskflow::files::FileClipboardBridge::clearIncomingStatus();
   if (!src && IsClipboardFormatAvailable(CF_HDROP))
     return true;
   MSWindowsClipboard dst(m_window);
@@ -347,6 +375,29 @@ bool MSWindowsComputer::setClipboard(ClipboardID, const IClipboard *src)
 
 void MSWindowsComputer::checkClipboards()
 {
+  if (deskflow::files::FileClipboardBridge::isNativePublicationInProgress())
+    return;
+  const auto clipboardSequence = GetClipboardSequenceNumber();
+  if (deskflow::files::FileClipboardBridge::isSuppressedSequence(clipboardSequence)) {
+    QJsonObject offer;
+    QJsonObject status;
+    if (m_isPrimary && deskflow::files::FileClipboardBridge::readIncomingOffer(offer) &&
+        deskflow::files::FileClipboardBridge::readIncomingStatus(status) &&
+        status.value("state") == QLatin1String("ready") && status.value("sequence") == offer.value("sequence") &&
+        status.value("key") == offer.value("key") && clipboardSequence != m_filePasteOfferClipboardSequence &&
+        IsClipboardFormatAvailable(CF_HDROP)) {
+      m_hook.setFilePastePending(false);
+      m_filePasteOfferClipboardSequence = 0;
+    }
+    return;
+  }
+  if (m_isPrimary && m_filePasteOfferClipboardSequence && clipboardSequence != m_filePasteOfferClipboardSequence) {
+    m_hook.setFilePastePending(false);
+    finishLocalFilePaste(false, "local clipboard changed");
+    m_filePasteOfferClipboardSequence = 0;
+    deskflow::files::FileClipboardBridge::clearIncomingOffer();
+    deskflow::files::FileClipboardBridge::clearIncomingStatus();
+  }
   // if we think we own the clipboard but we don't then somebody
   // grabbed the clipboard on this computer without us knowing.
   // tell the server that this computer grabbed the clipboard.
@@ -902,6 +953,10 @@ bool MSWindowsComputer::onPreDispatchPrimary(HWND, UINT message, WPARAM wParam, 
   case DESKFLOW_MSG_KEY:
     return onKey(wParam, lParam);
 
+  case DESKFLOW_MSG_FILE_PASTE:
+    beginLocalFilePaste(reinterpret_cast<HWND>(wParam), reinterpret_cast<HWND>(lParam));
+    return true;
+
   case DESKFLOW_MSG_MOUSE_BUTTON:
     return onMouseButton(wParam, lParam);
 
@@ -1356,6 +1411,17 @@ bool MSWindowsComputer::onDisplayChange()
 
 void MSWindowsComputer::onClipboardChange()
 {
+  if (deskflow::files::FileClipboardBridge::isNativePublicationInProgress())
+    return;
+  if (deskflow::files::FileClipboardBridge::isSuppressedSequence(GetClipboardSequenceNumber()))
+    return;
+  if (m_isPrimary) {
+    m_hook.setFilePastePending(false);
+    finishLocalFilePaste(false, "local clipboard changed");
+    m_filePasteOfferClipboardSequence = 0;
+  }
+  deskflow::files::FileClipboardBridge::clearIncomingOffer();
+  deskflow::files::FileClipboardBridge::clearIncomingStatus();
   // now notify client that somebody changed the clipboard (unless
   // we're the owner).
   if (!MSWindowsClipboard::isOwnedByDeskflow()) {
@@ -1369,6 +1435,152 @@ void MSWindowsComputer::onClipboardChange()
     LOG_DEBUG("clipboard changed: %s owned", kAppId);
     m_ownClipboard = true;
   }
+}
+
+void MSWindowsComputer::beginLocalFilePaste(HWND foreground, HWND focus)
+{
+  if (m_filePasteTimer || !m_isEnabled || !m_isPrimary || !m_isOnComputer || !foreground || !focus) {
+    if (!foreground || !focus)
+      LOG_INFO("deferred local file paste canceled: focused destination is unavailable");
+    m_hook.clearFilePasteRequest();
+    return;
+  }
+
+  QJsonObject offer;
+  QJsonObject status;
+  if (!deskflow::files::FileClipboardBridge::readIncomingOffer(offer) ||
+      !deskflow::files::FileClipboardBridge::readIncomingStatus(status) ||
+      offer.value("sequence") != status.value("sequence") || offer.value("key") != status.value("key") ||
+      status.value("state") == QLatin1String("failed")) {
+    finishLocalFilePaste(false, "file offer unavailable or transfer failed");
+    return;
+  }
+
+  GUITHREADINFO currentFocus{};
+  currentFocus.cbSize = sizeof(currentFocus);
+  if (GetForegroundWindow() != foreground || !GetGUIThreadInfo(0, &currentFocus) || currentFocus.hwndFocus != focus ||
+      m_hook.filePasteInteractionSerial() != m_hook.filePasteStartSerial()) {
+    m_hook.clearFilePasteRequest();
+    return;
+  }
+
+  m_filePasteSequence = offer.value("sequence").toString().toStdString();
+  m_filePasteKey = offer.value("key").toString().toStdString();
+  m_filePasteForeground = foreground;
+  m_filePasteFocus = focus;
+  m_filePasteInitialInteractionSerial = m_hook.filePasteStartSerial();
+  m_filePasteInitialClipboardSequence = GetClipboardSequenceNumber();
+  m_filePasteDeadline = std::chrono::steady_clock::now() + std::chrono::minutes(10);
+  m_filePasteTimer = m_events->newTimer(0.05, nullptr);
+  m_events->addHandler(EventTypes::Timer, m_filePasteTimer, [this](const auto &) { pollLocalFilePaste(); });
+  pollLocalFilePaste();
+}
+
+void MSWindowsComputer::pollLocalFilePaste()
+{
+  if (!m_filePasteTimer)
+    return;
+  if (!m_isEnabled || !m_isOnComputer || std::chrono::steady_clock::now() >= m_filePasteDeadline) {
+    finishLocalFilePaste(false, "screen changed or timed out");
+    return;
+  }
+
+  GUITHREADINFO focus{};
+  focus.cbSize = sizeof(focus);
+  if (GetForegroundWindow() != m_filePasteForeground || !GetGUIThreadInfo(0, &focus) ||
+      focus.hwndFocus != m_filePasteFocus ||
+      m_hook.filePasteInteractionSerial() != m_filePasteInitialInteractionSerial) {
+    finishLocalFilePaste(false, "paste destination changed");
+    return;
+  }
+
+  QJsonObject offer;
+  QJsonObject status;
+  if (!deskflow::files::FileClipboardBridge::readIncomingOffer(offer) ||
+      offer.value("sequence").toString().toStdString() != m_filePasteSequence ||
+      offer.value("key").toString().toStdString() != m_filePasteKey) {
+    finishLocalFilePaste(false, "file offer changed");
+    return;
+  }
+  if (!deskflow::files::FileClipboardBridge::readIncomingStatus(status) ||
+      status.value("sequence") != offer.value("sequence") || status.value("key") != offer.value("key") ||
+      status.value("state") == QLatin1String("failed")) {
+    finishLocalFilePaste(false, "file transfer failed");
+    return;
+  }
+
+  if (deskflow::files::FileClipboardBridge::isNativePublicationInProgress())
+    return;
+  const auto clipboardSequence = GetClipboardSequenceNumber();
+  const bool receivedClipboard = deskflow::files::FileClipboardBridge::isSuppressedSequence(clipboardSequence);
+  if ((clipboardSequence != m_filePasteInitialClipboardSequence ||
+       clipboardSequence != m_filePasteOfferClipboardSequence) &&
+      !receivedClipboard) {
+    finishLocalFilePaste(true, "clipboard replaced before file transfer completed");
+    return;
+  }
+  if (status.value("state") != QLatin1String("ready") || m_hook.isFilePasteVDown())
+    return;
+  if (!receivedClipboard || clipboardSequence == m_filePasteOfferClipboardSequence ||
+      !IsClipboardFormatAvailable(CF_HDROP)) {
+    finishLocalFilePaste(false, "file clipboard was not published");
+    return;
+  }
+
+  INPUT input[4]{};
+  UINT count = 0;
+  const bool ctrlHeld = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
+  const auto appendKey = [&](WORD key, DWORD flags) {
+    auto &item = input[count++];
+    item.type = INPUT_KEYBOARD;
+    item.ki.wVk = key;
+    item.ki.dwFlags = flags;
+    item.ki.dwExtraInfo = MSWindowsHook::kFilePasteReplayTag;
+  };
+  if (!ctrlHeld)
+    appendKey(VK_CONTROL, 0);
+  appendKey(VK_V, 0);
+  appendKey(VK_V, KEYEVENTF_KEYUP);
+  if (!ctrlHeld)
+    appendKey(VK_CONTROL, KEYEVENTF_KEYUP);
+
+  const UINT sent = SendInput(count, input, sizeof(INPUT));
+  if (sent != count) {
+    LOG_WARN(
+        "could not deliver deferred file paste: SendInput sent %u of %u events (error %lu)", sent, count, GetLastError()
+    );
+    INPUT release[2]{};
+    release[0].type = INPUT_KEYBOARD;
+    release[0].ki.wVk = VK_V;
+    release[0].ki.dwFlags = KEYEVENTF_KEYUP;
+    release[0].ki.dwExtraInfo = MSWindowsHook::kFilePasteReplayTag;
+    release[1].type = INPUT_KEYBOARD;
+    release[1].ki.wVk = VK_CONTROL;
+    release[1].ki.dwFlags = KEYEVENTF_KEYUP;
+    release[1].ki.dwExtraInfo = MSWindowsHook::kFilePasteReplayTag;
+    SendInput(2, release, sizeof(INPUT));
+  }
+  finishLocalFilePaste(true, sent == count ? nullptr : "synthetic paste failed");
+}
+
+void MSWindowsComputer::finishLocalFilePaste(bool disarm, const char *reason)
+{
+  if (m_filePasteTimer) {
+    m_events->removeHandler(EventTypes::Timer, m_filePasteTimer);
+    m_events->deleteTimer(m_filePasteTimer);
+    m_filePasteTimer = nullptr;
+    if (reason)
+      LOG_INFO("deferred local file paste canceled: %s", reason);
+  }
+  m_hook.clearFilePasteRequest();
+  if (disarm) {
+    m_hook.setFilePastePending(false);
+    m_filePasteOfferClipboardSequence = 0;
+  }
+  m_filePasteSequence.clear();
+  m_filePasteKey.clear();
+  m_filePasteForeground = nullptr;
+  m_filePasteFocus = nullptr;
 }
 
 void MSWindowsComputer::warpCursorNoFlush(int32_t x, int32_t y)
@@ -1459,6 +1671,8 @@ void MSWindowsComputer::handleFixes()
 {
   // fix clipboard chain
   fixClipboardViewer();
+
+  checkClipboards();
 
   // update keys if keyboard layouts have changed
   if (m_keyState->didGroupsChange()) {

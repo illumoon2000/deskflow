@@ -8,6 +8,17 @@
 #include <QSslKey>
 #include <QUrlQuery>
 namespace deskflow::gui::files {
+namespace {
+bool validToken(const QByteArray &token)
+{
+  if (token.size() != 64)
+    return false;
+  for (const auto digit : token)
+    if (!((digit >= '0' && digit <= '9') || (digit >= 'a' && digit <= 'f')))
+      return false;
+  return true;
+}
+} // namespace
 FileTransferService::FileTransferService(QObject *parent) : QObject(parent)
 {
   m_server.setHandshakeTimeout(10000);
@@ -37,7 +48,9 @@ FileTransferService::FileTransferService(QObject *parent) : QObject(parent)
       m_incoming = session;
       track(session, false);
       connect(session, &FileTransferSession::offered, this, [this, session] { Q_EMIT incoming(session); });
-      session->receive(m_settings.key, m_settings.limit);
+      session->receive(m_settings.key, m_settings.limit, m_pullEnabled, m_pullOfferKey, m_pullOfferSequence, [this] {
+        return std::pair{m_pullEnabled ? m_pullOfferKey : QByteArray{}, m_pullOfferSequence};
+      });
     }
   });
 }
@@ -52,6 +65,7 @@ FileTransferService::~FileTransferService()
 bool FileTransferService::configure(const FileSharingSettings &settings, const QString &certificatePath, QString &error)
 {
   cancelAll();
+  clearPullOffer();
   m_server.close();
   m_settings = settings;
   if (!settings.enabled)
@@ -124,6 +138,52 @@ FileTransferSession *FileTransferService::sendFiles(const QStringList &paths, QS
   socket->connectToHostEncrypted(peer.host(), quint16(peer.port()));
   return session;
 }
+FileTransferSession *FileTransferService::requestFiles(
+    const QUrl &peer, const QByteArray &key, const QByteArray &fingerprint, quint64 clipboardSequence, qint64 limit,
+    QString &error
+)
+{
+  if (!m_settings.enabled || !m_server.isListening()) {
+    error = tr("Enable file sharing first.");
+    return nullptr;
+  }
+  if (m_pulling) {
+    error = tr("Another file request is still running.");
+    return nullptr;
+  }
+  if (!peer.isValid() || peer.scheme() != "deskflow-files" || peer.host().isEmpty() || !peer.userInfo().isEmpty() ||
+      peer.port() <= 0 || peer.port() > 65535 || !validToken(key) || !validToken(fingerprint) || limit <= 0 ||
+      limit > m_settings.limit) {
+    error = tr("The file offer is invalid.");
+    return nullptr;
+  }
+  auto *socket = new QSslSocket;
+  socket->setSslConfiguration(m_ssl);
+  auto *session = new FileTransferSession(socket, false, this);
+  m_pulling = session;
+  connect(session, &FileTransferSession::finished, this, [this, session] {
+    if (m_pulling == session)
+      m_pulling.clear();
+  });
+  session->request(key, fingerprint, clipboardSequence, limit);
+  track(session, false);
+  socket->connectToHostEncrypted(peer.host(), quint16(peer.port()));
+  return session;
+}
+void FileTransferService::setPullOffer(const QByteArray &key, quint64 sequence)
+{
+  if (!validToken(key)) {
+    clearPullOffer();
+    return;
+  }
+  m_pullOfferKey = key;
+  m_pullOfferSequence = sequence;
+}
+void FileTransferService::clearPullOffer()
+{
+  m_pullOfferKey.clear();
+  m_pullOfferSequence = 0;
+}
 QString FileTransferService::pairingCode(const QString &host) const
 {
   if (!m_server.isListening() || host.trimmed().isEmpty())
@@ -145,9 +205,12 @@ void FileTransferService::cancelAll()
 {
   const auto outgoing = m_outgoing;
   const auto incoming = m_incoming;
+  const auto pulling = m_pulling;
   if (outgoing)
     outgoing->cancel();
   if (incoming)
     incoming->cancel();
+  if (pulling)
+    pulling->cancel();
 }
 } // namespace deskflow::gui::files

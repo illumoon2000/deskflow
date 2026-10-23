@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: GPL-2.0-only WITH LicenseRef-OpenSSL-Exception
  */
 #include "base/Log.h"
+#include "common/FileClipboardBridge.h"
 #include "deskflow/Clipboard.h"
 #include "gui/files/FileClipboard.h"
 #include "gui/files/FileManifest.h"
@@ -17,11 +18,13 @@
 #include "gui/files/FileSharingSettings.h"
 #include "gui/files/FileTransferService.h"
 #include "net/SecureUtils.h"
+#include <QDateTime>
 #include <QDir>
 #include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QSignalSpy>
+#include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QTest>
 #include <QUrlQuery>
@@ -60,6 +63,10 @@ private:
 private Q_SLOTS:
   void initTestCase()
   {
+    QStandardPaths::setTestModeEnabled(true);
+#ifdef Q_OS_WIN
+    QVERIFY(deskflow::files::FileClipboardBridge::directoryPath().contains("/qttest/", Qt::CaseInsensitive));
+#endif
     QVERIFY(m_temp.isValid());
     m_cert = m_temp.filePath("identity.pem");
     deskflow::generatePemSelfSignedCert(m_cert, 2048);
@@ -200,6 +207,26 @@ private Q_SLOTS:
     QCOMPARE(offered.count(), 0);
     QVERIFY(QDir(target.path()).entryList(QDir::NoDotAndDotDot | QDir::AllEntries | QDir::Hidden).isEmpty());
   }
+  void manualOfferRejectedInAutomaticMode()
+  {
+    QTemporaryDir source, target;
+    QVERIFY(put(source.filePath("old-client.txt"), "old client"));
+    FileTransferService receiver, sender;
+    receiver.setPullEnabled(true);
+    QString error;
+    QVERIFY2(receiver.configure(settings(target.path()), m_cert, error), qPrintable(error));
+    auto send = settings(source.path());
+    send.peerCode = receiver.pairingCode("127.0.0.1");
+    QVERIFY2(sender.configure(send, m_cert, error), qPrintable(error));
+    QSignalSpy approvals(&receiver, &FileTransferService::incoming);
+    auto *session = sender.sendFiles({source.filePath("old-client.txt")}, error);
+    QVERIFY2(session, qPrintable(error));
+    QSignalSpy done(session, &FileTransferSession::finished);
+    QVERIFY(done.wait(10000));
+    QVERIFY(!done[0][0].toBool());
+    QCOMPARE(approvals.count(), 0);
+    QVERIFY(!receiver.receiving());
+  }
   void wrongFingerprint()
   {
     QTemporaryDir source, target;
@@ -323,6 +350,43 @@ private Q_SLOTS:
     QCOMPARE(offers.count(), 0);
     QVERIFY(QDir(target.path()).entryList(QDir::NoDotAndDotDot | QDir::AllEntries | QDir::Hidden).isEmpty());
   }
+  void idleTlsPeerReleasesIncomingSlot()
+  {
+    QTemporaryDir source, target;
+    QVERIFY(put(source.filePath("after-idle.txt"), "reachable"));
+    FileTransferService receiver, sender;
+    QString error;
+    QVERIFY2(receiver.configure(settings(target.path()), m_cert, error), qPrintable(error));
+
+    bool idleTimedOut = false;
+    int incomingSessions = 0;
+    connect(&receiver, &FileTransferService::started, this, [&](FileTransferSession *session, bool outgoing) {
+      if (!outgoing && ++incomingSessions == 1)
+        connect(session, &FileTransferSession::finished, this, [&](bool success, const QString &message) {
+          idleTimedOut = !success && message.contains("timed out");
+        });
+    });
+    QSslSocket idle;
+    idle.setPeerVerifyMode(QSslSocket::VerifyNone);
+    QSignalSpy encrypted(&idle, &QSslSocket::encrypted);
+    idle.connectToHostEncrypted("127.0.0.1", receiver.port());
+    QVERIFY(encrypted.wait(10000));
+    QTRY_VERIFY_WITH_TIMEOUT(idleTimedOut, 8000);
+    QVERIFY(!receiver.receiving());
+
+    auto send = settings(source.path());
+    send.peerCode = receiver.pairingCode("127.0.0.1");
+    QVERIFY2(sender.configure(send, m_cert, error), qPrintable(error));
+    connect(&receiver, &FileTransferService::incoming, this, [&target](FileTransferSession *session) {
+      session->accept(target.path());
+    });
+    auto *session = sender.sendFiles({source.filePath("after-idle.txt")}, error);
+    QVERIFY2(session, qPrintable(error));
+    QSignalSpy done(session, &FileTransferSession::finished);
+    QVERIFY(done.wait(10000));
+    QVERIFY2(done[0][0].toBool(), qPrintable(done[0][1].toString()));
+    QCOMPARE(incomingSessions, 2);
+  }
   void unknownClipboardFormatIsIgnored()
   {
     QByteArray data(12, '\0');
@@ -361,6 +425,16 @@ private Q_SLOTS:
       }
     } restore;
     QVERIFY(publishFiles({file, folder}));
+    const QJsonObject endpoint{
+        {"version", 2},
+        {"updatedMs", QDateTime::currentMSecsSinceEpoch()},
+        {"addresses", QJsonArray{"127.0.0.1"}},
+        {"port", 24801},
+        {"pin", QString(64, 'a')},
+        {"key", QString(64, 'b')}
+    };
+    QString endpointError;
+    QVERIFY2(deskflow::files::FileClipboardBridge::writeEndpoint(endpoint, &endpointError), qPrintable(endpointError));
     const auto copied = copiedFiles();
     QCOMPARE(copied.size(), 2);
     QCOMPARE(QFileInfo(copied[0]).canonicalFilePath(), QFileInfo(file).canonicalFilePath());
@@ -378,8 +452,20 @@ private Q_SLOTS:
     QVERIFY(IClipboard::copy(&memory, &native));
     QVERIFY(memory.open(0));
     QVERIFY(memory.has(IClipboard::Format::Files));
+    const auto payload = memory.get(IClipboard::Format::Files);
+    QVERIFY(!payload.empty());
+    QVERIFY(deskflow::files::FileClipboardBridge::writeIncomingOffer(payload));
+    QJsonObject incoming, status;
+    QVERIFY(deskflow::files::FileClipboardBridge::readIncomingOffer(incoming));
+    QVERIFY(deskflow::files::FileClipboardBridge::readIncomingStatus(status));
+    QCOMPARE(status.value("state").toString(), QStringLiteral("pending"));
+    QCOMPARE(incoming.value("key"), status.value("key"));
     memory.close();
 #endif
+    deskflow::files::FileClipboardBridge::clearIncomingOffer();
+    deskflow::files::FileClipboardBridge::clearIncomingStatus();
+    deskflow::files::FileClipboardBridge::clearSourceOffer();
+    QFile::remove(deskflow::files::FileClipboardBridge::endpointPath());
   }
   void fileClipboardMarkerRoundTrip()
   {
@@ -392,6 +478,154 @@ private Q_SLOTS:
     QVERIFY(target.has(IClipboard::Format::Files));
     QCOMPARE(target.get(IClipboard::Format::Files), std::string("file-sharing-v1"));
     target.close();
+  }
+  void copiedFileOfferSurvivesTenMinutes()
+  {
+    using deskflow::files::FileClipboardBridge;
+    const QJsonObject endpoint{
+        {"version", 2},
+        {"updatedMs", QDateTime::currentMSecsSinceEpoch()},
+        {"addresses", QJsonArray{"127.0.0.1"}},
+        {"port", 24801},
+        {"pin", QString(64, 'a')},
+        {"key", QString(64, 'b')}
+    };
+    QString error;
+    QVERIFY2(FileClipboardBridge::writeEndpoint(endpoint, &error), qPrintable(error));
+    const auto payload = FileClipboardBridge::clipboardPayload(12345);
+    QVERIFY(!payload.empty());
+    const auto offer = QJsonDocument::fromJson(QByteArray::fromStdString(payload)).object();
+    const auto token = offer.value("key").toString();
+    QVERIFY(token.size() == 64);
+
+    const auto oldTime = QDateTime::currentMSecsSinceEpoch() - 11 * 60 * 1000;
+    QJsonObject source;
+    QVERIFY(FileClipboardBridge::readSourceOffer(source));
+    source.insert("updatedMs", oldTime);
+    QVERIFY(put(FileClipboardBridge::sourceOfferPath(), QJsonDocument(source).toJson(QJsonDocument::Compact)));
+    QVERIFY(FileClipboardBridge::readSourceOffer(source));
+    const auto refreshed =
+        QJsonDocument::fromJson(QByteArray::fromStdString(FileClipboardBridge::clipboardPayload(12345))).object();
+    QCOMPARE(refreshed.value("key").toString(), token);
+
+    QVERIFY(FileClipboardBridge::writeIncomingOffer(payload));
+    QJsonObject status{
+        {"version", 2},
+        {"sequence", offer.value("sequence")},
+        {"key", token},
+        {"state", "ready"},
+        {"updatedMs", oldTime}
+    };
+    QVERIFY(FileClipboardBridge::writeIncomingStatus(status));
+    QVERIFY(FileClipboardBridge::readIncomingStatus(status));
+    QVERIFY(FileClipboardBridge::writeIncomingOffer(payload));
+    QVERIFY(FileClipboardBridge::readIncomingStatus(status));
+    QCOMPARE(status.value("state").toString(), QStringLiteral("ready"));
+
+    FileClipboardBridge::clearIncomingOffer();
+    FileClipboardBridge::clearIncomingStatus();
+    FileClipboardBridge::clearSourceOffer();
+    QFile::remove(FileClipboardBridge::endpointPath());
+  }
+  void receivedClipboardSuppressionIsScopedToCurrentBoot()
+  {
+    using deskflow::files::FileClipboardBridge;
+    constexpr quint64 sequence = 987654321;
+    QVERIFY(FileClipboardBridge::writeSuppressedSequence(sequence));
+    QVERIFY(FileClipboardBridge::isSuppressedSequence(sequence));
+    QVERIFY(!FileClipboardBridge::isSuppressedSequence(sequence + 1));
+
+    const auto markerPath = FileClipboardBridge::suppressedSequencePath();
+    auto marker = QJsonDocument::fromJson(get(markerPath)).object();
+    bool ok = false;
+    const auto bootTime = marker.value("bootTimeMs").toString().toLongLong(&ok);
+    QVERIFY(ok);
+    marker.insert("bootTimeMs", QString::number(bootTime + 60 * 60 * 1000));
+    QVERIFY(put(markerPath, QJsonDocument(marker).toJson(QJsonDocument::Compact)));
+    QVERIFY(!FileClipboardBridge::isSuppressedSequence(sequence));
+    QVERIFY(QFile::remove(markerPath));
+  }
+  void nativeClipboardPullRoundTrip()
+  {
+    if (!qEnvironmentVariableIsSet("CI") && !qEnvironmentVariableIsSet("DESKFLOW_TEST_NATIVE_CLIPBOARD"))
+      QSKIP("Native clipboard transfer is opt-in on a personal desktop.");
+    struct RestoreClipboard
+    {
+      QMimeData *saved = new QMimeData;
+      RestoreClipboard()
+      {
+        const auto *current = QGuiApplication::clipboard()->mimeData();
+        if (current)
+          for (const auto &format : current->formats())
+            saved->setData(format, current->data(format));
+      }
+      ~RestoreClipboard()
+      {
+        QGuiApplication::clipboard()->setMimeData(saved);
+      }
+    } restore;
+    QTemporaryDir source, target;
+    QVERIFY(QDir().mkpath(source.filePath("folder/empty")));
+    const QByteArray payload(128 * 1024 + 7, 'p');
+    QVERIFY(put(source.filePath("folder/data.bin"), payload));
+    QVERIFY(put(source.filePath("second.txt"), "second"));
+    FileTransferService provider, receiver;
+    QString error;
+    QVERIFY2(provider.configure(settings(source.path()), m_cert, error), qPrintable(error));
+    QVERIFY2(receiver.configure(settings(target.path()), m_cert, error), qPrintable(error));
+    QVERIFY(publishFiles({source.filePath("folder"), source.filePath("second.txt")}));
+    const auto sequence = clipboardSequence();
+    const QByteArray token(64, 'b');
+    provider.setPullOffer(token, sequence);
+    const QUrl peer(provider.pairingCode("127.0.0.1"));
+    const QByteArray fingerprint = QUrlQuery(peer).queryItemValue("fingerprint").toLatin1();
+    QSignalSpy unexpectedApproval(&provider, &FileTransferService::incoming);
+    auto *disabled = receiver.requestFiles(peer, token, fingerprint, sequence, 8 * 1024 * 1024, error);
+    QVERIFY2(disabled, qPrintable(error));
+    QSignalSpy disabledDone(disabled, &FileTransferSession::finished);
+    QVERIFY(disabledDone.wait(10000));
+    QVERIFY(!disabledDone[0][0].toBool());
+    provider.setPullEnabled(true);
+    QStringList received;
+    auto *session = receiver.requestFiles(peer, token, fingerprint, sequence, 8 * 1024 * 1024, error);
+    QVERIFY2(session, qPrintable(error));
+    connect(session, &FileTransferSession::offered, session, [session, &target] { session->accept(target.path()); });
+    connect(session, &FileTransferSession::completed, this, [&](const QStringList &paths) { received = paths; });
+    QSignalSpy done(session, &FileTransferSession::finished);
+    QVERIFY(done.wait(15000));
+    QVERIFY2(done[0][0].toBool(), qPrintable(done[0][1].toString()));
+    QCOMPARE(unexpectedApproval.count(), 0);
+    QCOMPARE(received.size(), 2);
+    QCOMPARE(get(QDir(received[0]).filePath("data.bin")), payload);
+    QVERIFY(QDir(QDir(received[0]).filePath("empty")).exists());
+    QCOMPARE(get(received[1]), QByteArray("second"));
+
+    auto *wrongKey = receiver.requestFiles(peer, QByteArray(64, 'c'), fingerprint, sequence, 8 * 1024 * 1024, error);
+    QVERIFY2(wrongKey, qPrintable(error));
+    QSignalSpy wrongKeyDone(wrongKey, &FileTransferSession::finished);
+    QVERIFY(wrongKeyDone.wait(10000));
+    QVERIFY(!wrongKeyDone[0][0].toBool());
+    auto *wrongPin = receiver.requestFiles(peer, token, QByteArray(64, '0'), sequence, 8 * 1024 * 1024, error);
+    QVERIFY2(wrongPin, qPrintable(error));
+    QSignalSpy wrongPinDone(wrongPin, &FileTransferSession::finished);
+    QVERIFY(wrongPinDone.wait(10000));
+    QVERIFY(!wrongPinDone[0][0].toBool());
+
+    // Replacing the clipboard invalidates the original offer, even while a
+    // previous token remains registered in the provider.
+    QVERIFY(publishFiles({source.filePath("second.txt")}));
+    auto *stale = receiver.requestFiles(peer, token, fingerprint, sequence, 8 * 1024 * 1024, error);
+    QVERIFY2(stale, qPrintable(error));
+    QSignalSpy staleDone(stale, &FileTransferSession::finished);
+    QVERIFY(staleDone.wait(10000));
+    QVERIFY(!staleDone[0][0].toBool());
+
+    provider.setPullOffer({}, 0);
+    auto *revoked = receiver.requestFiles(peer, token, fingerprint, clipboardSequence(), 8 * 1024 * 1024, error);
+    QVERIFY2(revoked, qPrintable(error));
+    QSignalSpy revokedDone(revoked, &FileTransferSession::finished);
+    QVERIFY(revokedDone.wait(10000));
+    QVERIFY(!revokedDone[0][0].toBool());
   }
 };
 QTEST_MAIN(FileSharingTests)

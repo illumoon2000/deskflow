@@ -3,10 +3,12 @@
  * SPDX-License-Identifier: GPL-2.0-only WITH LicenseRef-OpenSSL-Exception
  */
 #include "FileTransferSession.h"
+#include "FileClipboard.h"
 #include <QDateTime>
 #include <QDir>
 #include <QFileInfo>
 #include <QJsonDocument>
+#include <QJsonObject>
 #include <QSslCertificate>
 #include <QStorageInfo>
 #include <QUuid>
@@ -78,13 +80,46 @@ void FileTransferSession::send(const FileManifest &manifest, const QByteArray &k
     writeFrame(Offer, QJsonDocument(offer).toJson(QJsonDocument::Compact));
   });
 }
-void FileTransferSession::receive(const QByteArray &key, qint64 limit)
+void FileTransferSession::receive(
+    const QByteArray &key, qint64 limit, bool allowPull, const QByteArray &pullKey, quint64 pullSequence,
+    PullGrant currentPullGrant
+)
 {
   m_key = key;
   m_limit = limit;
+  m_allowPull = allowPull;
+  m_pullKey = pullKey;
+  m_pullSequence = pullSequence;
+  m_currentPullGrant = std::move(currentPullGrant);
   m_state = State::Offer;
+  // A TLS peer that never sends a first frame must not monopolize the one
+  // inbound transfer slot for the full streaming timeout.
+  m_timeout.setInterval(5000);
+  m_timeout.start();
   if (m_socket->bytesAvailable())
     QTimer::singleShot(0, this, &FileTransferSession::readyRead);
+}
+void FileTransferSession::request(const QByteArray &key, const QByteArray &fingerprint, quint64 sequence, qint64 limit)
+{
+  m_key = key;
+  m_limit = limit;
+  m_state = State::Connecting;
+  // An offer can list several addresses. Try the next route promptly when a
+  // connection or TLS handshake cannot complete.
+  m_timeout.setInterval(5000);
+  m_timeout.start();
+  connect(m_socket, &QSslSocket::encrypted, this, [this, fingerprint, sequence] {
+    if (m_socket->peerCertificate().isNull() ||
+        m_socket->peerCertificate().digest(QCryptographicHash::Sha256).toHex() != fingerprint) {
+      fail(tr("The other computer's fingerprint does not match the file offer."));
+      return;
+    }
+    const QJsonObject request{
+        {"version", 1}, {"key", QString::fromLatin1(m_key)}, {"sequence", QString::number(sequence)}
+    };
+    m_state = State::Offer;
+    writeFrame(Request, QJsonDocument(request).toJson(QJsonDocument::Compact));
+  });
 }
 void FileTransferSession::writeFrame(quint8 type, const QByteArray &body)
 {
@@ -187,7 +222,52 @@ void FileTransferSession::process(quint8 type, const QByteArray &body)
     fail(tr("The other computer cancelled or declined the transfer."));
     return;
   }
+  if (!m_sender && type == Request && m_state == State::Offer && m_allowPull) {
+    // A request grants access only to the currently copied files for this
+    // single advertised offer. The key travels over the authenticated core
+    // clipboard channel before it is used on this TLS connection.
+    if (body.size() > 256) {
+      fail(tr("Invalid file request."));
+      return;
+    }
+    const auto doc = QJsonDocument::fromJson(body);
+    const auto object = doc.object();
+    const auto sequenceText = object.value("sequence").toString();
+    bool sequenceOk = false;
+    const auto sequence = sequenceText.toULongLong(&sequenceOk);
+    const auto currentGrant = m_currentPullGrant ? m_currentPullGrant() : std::pair<QByteArray, quint64>{};
+    if (!doc.isObject() || object.value("version").toInt() != 1 ||
+        !sameKey(object.value("key").toString().toLatin1(), m_pullKey) || !sequenceOk ||
+        !sameKey(object.value("key").toString().toLatin1(), currentGrant.first) ||
+        QString::number(sequence) != sequenceText || sequence != m_pullSequence || sequence != currentGrant.second ||
+        sequence != clipboardSequence()) {
+      fail(tr("The copied files changed or the file request is not authorized."));
+      return;
+    }
+    QString error;
+    if (!FileManifest::build(copiedFiles(), m_limit, m_manifest, error)) {
+      fail(error);
+      return;
+    }
+    if (clipboardSequence() != sequence) {
+      fail(tr("The copied files changed before the request completed."));
+      return;
+    }
+    m_sender = true;
+    auto offer = m_manifest.toJson();
+    offer.insert("version", 1);
+    offer.insert("key", QString::fromLatin1(m_pullKey));
+    m_state = State::Approval;
+    m_timeout.setInterval(120000);
+    m_timeout.start();
+    writeFrame(Offer, QJsonDocument(offer).toJson(QJsonDocument::Compact));
+    return;
+  }
   if (!m_sender && type == Offer && m_state == State::Offer) {
+    if (m_allowPull) {
+      fail(tr("Manual file offers are unavailable in automatic file sharing mode."));
+      return;
+    }
     const auto doc = QJsonDocument::fromJson(body);
     const auto object = doc.object();
     if (!doc.isObject() || object.value("version").toInt() != 1 ||
@@ -200,6 +280,8 @@ void FileTransferSession::process(quint8 type, const QByteArray &body)
       fail(error);
       return;
     }
+    m_timeout.setInterval(120000);
+    m_timeout.start();
     m_state = State::Approval;
     Q_EMIT offered();
     return;

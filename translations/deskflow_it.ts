@@ -1459,44 +1459,7 @@ L&apos;abilitazione di questa impostazione disabiliterà l&apos;interfaccia graf
 <context>
     <name>deskflow::gui::files::FileSharingDialog</name>
     <message>
-        <source>File Sharing</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Copy files or folders in Finder / Explorer, wait for transfer completion, then paste on the other computer.
-Both computers must run this Deskflow fork with file sharing enabled.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Enable file sharing</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>This computer&apos;s LAN address</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>My address:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Receiving port:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Paste the other computer&apos;s pairing code</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Other computer:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Browse…</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Receive files in:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -1508,52 +1471,15 @@ Both computers must run this Deskflow fork with file sharing enabled.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Automatically send files copied in Finder / Explorer to the other computer</source>
+        <source>Copy a file or folder in Finder / Explorer, then paste on the other computer with Cmd+V or Ctrl+V. Deskflow transfers it automatically.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Automatically accept requests using my pairing code</source>
+        <source>Received files:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Keep pairing codes private. Copy this computer&apos;s code to the other computer, and paste its code here.
-Incoming files require approval unless automatic acceptance is enabled. Original files are never moved or deleted.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Apply settings</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Copy my pairing code</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Reset my pairing code</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Reset pairing code?</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Old codes will stop accepting incoming transfers. Copy the new code to the other computer.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Pairing code reset. Copy the new code to the other computer.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Send files…</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Send folder…</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Cancel transfers</source>
+        <source>Save</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -1569,7 +1495,67 @@ Incoming files require approval unless automatic acceptance is enabled. Original
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Copy received files for pasting</source>
+        <source>Received files</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Choose an absolute folder for received files.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>File sharing settings saved.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>File sharing preview</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enable Deskflow encryption and peer verification to share files by copy and paste.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot create the file sharing TLS certificate.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ready. Copy a file in Finder / Explorer and paste on the other computer.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Receiving copied files…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot connect to the other computer to receive copied files.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The clipboard changed while files were being received.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Could not prepare the file clipboard.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Could not place the received files on the clipboard.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Files are ready. Paste in Finder / Explorer.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>File transfer complete. Paste in Finder / Explorer.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Copied files</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Connecting…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -1577,59 +1563,15 @@ Incoming files require approval unless automatic acceptance is enabled. Original
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Cancel transfer</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Close</source>
         <translation type="unfinished">Vicino</translation>
     </message>
     <message>
-        <source>Receive files in</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Apply settings and enter this computer&apos;s reachable address first.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Pairing code copied. Paste it only on the other computer.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Send files</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Send folder</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>File sharing could not start: %1</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>File sharing ready. Drop files here to send them.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>File sharing is disabled.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Choose an absolute receiving folder and a valid peer pairing code for clipboard sharing.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Cannot generate the TLS certificate.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Settings could not be saved securely. File sharing has been stopped.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Ready on port %1. Exchange pairing codes on both computers.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Incoming files</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -1641,33 +1583,7 @@ Incoming files require approval unless automatic acceptance is enabled. Original
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Connecting / waiting for approval</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>%1 / %2 MiB (%3%)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Files received. The clipboard changed; use ‘Copy received files’ to prepare pasting.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Files received. Open File Sharing or paste in Finder / Explorer once ready.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Receive files?</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Receive %1 into %2?
-Total: %3 MiB
-The sender has this computer&apos;s pairing code.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Files are ready. Paste in Finder / Explorer on this computer.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -1701,6 +1617,14 @@ The sender has this computer&apos;s pairing code.</source>
         <source>Paste the other computer&apos;s pairing code in File Sharing settings.</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Another file request is still running.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The file offer is invalid.</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>deskflow::gui::files::FileTransferSession</name>
@@ -1714,6 +1638,10 @@ The sender has this computer&apos;s pairing code.</source>
     </message>
     <message>
         <source>The other computer&apos;s fingerprint does not match its pairing code. Pair again.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The other computer&apos;s fingerprint does not match the file offer.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -1742,6 +1670,22 @@ The sender has this computer&apos;s pairing code.</source>
     </message>
     <message>
         <source>The other computer cancelled or declined the transfer.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Invalid file request.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The copied files changed or the file request is not authorized.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The copied files changed before the request completed.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Manual file offers are unavailable in automatic file sharing mode.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>

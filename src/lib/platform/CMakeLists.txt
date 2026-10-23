@@ -74,7 +74,7 @@ elseif(APPLE)
     IOSXKeyResource.cpp
     IOSXKeyResource.h
     OSXAutoTypes.h
-    OSXClipboard.cpp
+    OSXClipboard.mm
     OSXClipboard.h
     OSXClipboardAnyBitmapConverter.cpp
     OSXClipboardAnyBitmapConverter.h

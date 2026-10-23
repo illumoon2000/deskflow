@@ -1459,37 +1459,37 @@ Enabling this setting will disable the server config GUI.</source>
     <name>deskflow::gui::files::FileSharingDialog</name>
     <message>
         <source>File Sharing</source>
-        <translation>파일 공유</translation>
+        <translation type="vanished">파일 공유</translation>
     </message>
     <message>
         <source>Copy files or folders in Finder / Explorer, wait for transfer completion, then paste on the other computer.
 Both computers must run this Deskflow fork with file sharing enabled.</source>
-        <translation>Finder·탐색기에서 파일이나 폴더를 복사하고, 전송 완료 후 상대 컴퓨터에서 붙여넣으세요.
+        <translation type="vanished">Finder·탐색기에서 파일이나 폴더를 복사하고, 전송 완료 후 상대 컴퓨터에서 붙여넣으세요.
 두 컴퓨터 모두 이 Deskflow 포크에서 파일 공유를 켜야 합니다.</translation>
     </message>
     <message>
         <source>Enable file sharing</source>
-        <translation>파일 공유 사용</translation>
+        <translation type="vanished">파일 공유 사용</translation>
     </message>
     <message>
         <source>This computer&apos;s LAN address</source>
-        <translation>이 컴퓨터의 내부 네트워크 주소</translation>
+        <translation type="vanished">이 컴퓨터의 내부 네트워크 주소</translation>
     </message>
     <message>
         <source>My address:</source>
-        <translation>내 주소:</translation>
+        <translation type="vanished">내 주소:</translation>
     </message>
     <message>
         <source>Receiving port:</source>
-        <translation>수신 포트:</translation>
+        <translation type="vanished">수신 포트:</translation>
     </message>
     <message>
         <source>Paste the other computer&apos;s pairing code</source>
-        <translation>상대 컴퓨터의 연결 코드를 붙여넣으세요</translation>
+        <translation type="vanished">상대 컴퓨터의 연결 코드를 붙여넣으세요</translation>
     </message>
     <message>
         <source>Other computer:</source>
-        <translation>상대 컴퓨터:</translation>
+        <translation type="vanished">상대 컴퓨터:</translation>
     </message>
     <message>
         <source>Browse…</source>
@@ -1497,7 +1497,7 @@ Both computers must run this Deskflow fork with file sharing enabled.</source>
     </message>
     <message>
         <source>Receive files in:</source>
-        <translation>수신 폴더:</translation>
+        <translation type="vanished">수신 폴더:</translation>
     </message>
     <message>
         <source> MiB</source>
@@ -1509,53 +1509,53 @@ Both computers must run this Deskflow fork with file sharing enabled.</source>
     </message>
     <message>
         <source>Automatically send files copied in Finder / Explorer to the other computer</source>
-        <translation>Finder·탐색기에서 복사한 파일을 상대 컴퓨터로 자동 전송</translation>
+        <translation type="vanished">Finder·탐색기에서 복사한 파일을 상대 컴퓨터로 자동 전송</translation>
     </message>
     <message>
         <source>Automatically accept requests using my pairing code</source>
-        <translation>내 연결 코드를 사용하는 수신 요청을 자동 승인</translation>
+        <translation type="vanished">내 연결 코드를 사용하는 수신 요청을 자동 승인</translation>
     </message>
     <message>
         <source>Keep pairing codes private. Copy this computer&apos;s code to the other computer, and paste its code here.
 Incoming files require approval unless automatic acceptance is enabled. Original files are never moved or deleted.</source>
-        <translation>연결 코드는 상대 컴퓨터에만 전달하세요. 내 코드를 상대에게 복사하고 상대 코드는 여기에 붙여넣으세요.
+        <translation type="vanished">연결 코드는 상대 컴퓨터에만 전달하세요. 내 코드를 상대에게 복사하고 상대 코드는 여기에 붙여넣으세요.
 자동 승인을 켜지 않으면 파일 수신마다 확인합니다. 원본 파일은 이동하거나 삭제하지 않습니다.</translation>
     </message>
     <message>
         <source>Apply settings</source>
-        <translation>설정 적용</translation>
+        <translation type="vanished">설정 적용</translation>
     </message>
     <message>
         <source>Copy my pairing code</source>
-        <translation>내 연결 코드 복사</translation>
+        <translation type="vanished">내 연결 코드 복사</translation>
     </message>
     <message>
         <source>Reset my pairing code</source>
-        <translation>내 연결 코드 초기화</translation>
+        <translation type="vanished">내 연결 코드 초기화</translation>
     </message>
     <message>
         <source>Reset pairing code?</source>
-        <translation>연결 코드를 초기화하시겠습니까?</translation>
+        <translation type="vanished">연결 코드를 초기화하시겠습니까?</translation>
     </message>
     <message>
         <source>Old codes will stop accepting incoming transfers. Copy the new code to the other computer.</source>
-        <translation>기존 코드로는 파일을 받을 수 없게 됩니다. 새 코드를 상대 컴퓨터에 전달하세요.</translation>
+        <translation type="vanished">기존 코드로는 파일을 받을 수 없게 됩니다. 새 코드를 상대 컴퓨터에 전달하세요.</translation>
     </message>
     <message>
         <source>Pairing code reset. Copy the new code to the other computer.</source>
-        <translation>연결 코드를 초기화했습니다. 새 코드를 상대 컴퓨터에 전달하세요.</translation>
+        <translation type="vanished">연결 코드를 초기화했습니다. 새 코드를 상대 컴퓨터에 전달하세요.</translation>
     </message>
     <message>
         <source>Send files…</source>
-        <translation>파일 보내기…</translation>
+        <translation type="vanished">파일 보내기…</translation>
     </message>
     <message>
         <source>Send folder…</source>
-        <translation>폴더 보내기…</translation>
+        <translation type="vanished">폴더 보내기…</translation>
     </message>
     <message>
         <source>Cancel transfers</source>
-        <translation>전송 취소</translation>
+        <translation type="vanished">전송 취소</translation>
     </message>
     <message>
         <source>Files</source>
@@ -1571,7 +1571,7 @@ Incoming files require approval unless automatic acceptance is enabled. Original
     </message>
     <message>
         <source>Copy received files for pasting</source>
-        <translation>받은 파일을 클립보드에 복사</translation>
+        <translation type="vanished">받은 파일을 클립보드에 복사</translation>
     </message>
     <message>
         <source>Open received folder</source>
@@ -1583,23 +1583,23 @@ Incoming files require approval unless automatic acceptance is enabled. Original
     </message>
     <message>
         <source>Receive files in</source>
-        <translation>수신 폴더 선택</translation>
+        <translation type="vanished">수신 폴더 선택</translation>
     </message>
     <message>
         <source>Apply settings and enter this computer&apos;s reachable address first.</source>
-        <translation>설정을 적용한 뒤 상대 컴퓨터에서 접속할 수 있는 내 주소를 입력하세요.</translation>
+        <translation type="vanished">설정을 적용한 뒤 상대 컴퓨터에서 접속할 수 있는 내 주소를 입력하세요.</translation>
     </message>
     <message>
         <source>Pairing code copied. Paste it only on the other computer.</source>
-        <translation>연결 코드를 복사했습니다. 상대 컴퓨터에만 붙여넣으세요.</translation>
+        <translation type="vanished">연결 코드를 복사했습니다. 상대 컴퓨터에만 붙여넣으세요.</translation>
     </message>
     <message>
         <source>Send files</source>
-        <translation>보낼 파일 선택</translation>
+        <translation type="vanished">보낼 파일 선택</translation>
     </message>
     <message>
         <source>Send folder</source>
-        <translation>보낼 폴더 선택</translation>
+        <translation type="vanished">보낼 폴더 선택</translation>
     </message>
     <message>
         <source>File sharing could not start: %1</source>
@@ -1607,31 +1607,31 @@ Incoming files require approval unless automatic acceptance is enabled. Original
     </message>
     <message>
         <source>File sharing ready. Drop files here to send them.</source>
-        <translation>파일 공유가 준비됐습니다. 여기에 파일을 끌어 놓아 보내세요.</translation>
+        <translation type="vanished">파일 공유가 준비됐습니다. 여기에 파일을 끌어 놓아 보내세요.</translation>
     </message>
     <message>
         <source>File sharing is disabled.</source>
-        <translation>파일 공유가 꺼져 있습니다.</translation>
+        <translation type="vanished">파일 공유가 꺼져 있습니다.</translation>
     </message>
     <message>
         <source>Choose an absolute receiving folder and a valid peer pairing code for clipboard sharing.</source>
-        <translation>수신 폴더의 전체 경로와 클립보드 공유에 사용할 상대 연결 코드를 확인하세요.</translation>
+        <translation type="vanished">수신 폴더의 전체 경로와 클립보드 공유에 사용할 상대 연결 코드를 확인하세요.</translation>
     </message>
     <message>
         <source>Cannot generate the TLS certificate.</source>
-        <translation>TLS 인증서를 만들지 못했습니다.</translation>
+        <translation type="vanished">TLS 인증서를 만들지 못했습니다.</translation>
     </message>
     <message>
         <source>Settings could not be saved securely. File sharing has been stopped.</source>
-        <translation>설정을 안전하게 저장하지 못해 파일 공유를 중지했습니다.</translation>
+        <translation type="vanished">설정을 안전하게 저장하지 못해 파일 공유를 중지했습니다.</translation>
     </message>
     <message>
         <source>Ready on port %1. Exchange pairing codes on both computers.</source>
-        <translation>%1번 포트에서 대기 중입니다. 두 컴퓨터의 연결 코드를 서로 교환하세요.</translation>
+        <translation type="vanished">%1번 포트에서 대기 중입니다. 두 컴퓨터의 연결 코드를 서로 교환하세요.</translation>
     </message>
     <message>
         <source>Incoming files</source>
-        <translation>수신 파일</translation>
+        <translation type="vanished">수신 파일</translation>
     </message>
     <message>
         <source>Sending</source>
@@ -1643,7 +1643,7 @@ Incoming files require approval unless automatic acceptance is enabled. Original
     </message>
     <message>
         <source>Connecting / waiting for approval</source>
-        <translation>연결 / 수신 승인 대기</translation>
+        <translation type="vanished">연결 / 수신 승인 대기</translation>
     </message>
     <message>
         <source>%1 / %2 MiB (%3%)</source>
@@ -1651,31 +1651,111 @@ Incoming files require approval unless automatic acceptance is enabled. Original
     </message>
     <message>
         <source>Files received. The clipboard changed; use ‘Copy received files’ to prepare pasting.</source>
-        <translation>파일을 받았습니다. 클립보드가 바뀌었으므로 ‘받은 파일을 클립보드에 복사’를 누른 뒤 붙여넣으세요.</translation>
+        <translation type="vanished">파일을 받았습니다. 클립보드가 바뀌었으므로 ‘받은 파일을 클립보드에 복사’를 누른 뒤 붙여넣으세요.</translation>
     </message>
     <message>
         <source>Files received. Open File Sharing or paste in Finder / Explorer once ready.</source>
-        <translation>파일을 받았습니다. 파일 공유 창을 열거나 준비가 끝나면 Finder·탐색기에서 붙여넣으세요.</translation>
+        <translation type="vanished">파일을 받았습니다. 파일 공유 창을 열거나 준비가 끝나면 Finder·탐색기에서 붙여넣으세요.</translation>
     </message>
     <message>
         <source>Receive files?</source>
-        <translation>파일을 받으시겠습니까?</translation>
+        <translation type="vanished">파일을 받으시겠습니까?</translation>
     </message>
     <message>
         <source>Receive %1 into %2?
 Total: %3 MiB
 The sender has this computer&apos;s pairing code.</source>
-        <translation>%1을(를) %2에 받으시겠습니까?
+        <translation type="vanished">%1을(를) %2에 받으시겠습니까?
 총 용량: %3 MiB
 보낸 사람은 이 컴퓨터의 연결 코드를 가지고 있습니다.</translation>
     </message>
     <message>
         <source>Files are ready. Paste in Finder / Explorer on this computer.</source>
-        <translation>파일이 준비됐습니다. 이 컴퓨터의 Finder·탐색기에서 붙여넣으세요.</translation>
+        <translation type="vanished">파일이 준비됐습니다. 이 컴퓨터의 Finder·탐색기에서 붙여넣으세요.</translation>
     </message>
     <message>
         <source>File sharing</source>
         <translation>파일 공유</translation>
+    </message>
+    <message>
+        <source>Copy a file or folder in Finder / Explorer, then paste on the other computer with Cmd+V or Ctrl+V. Deskflow transfers it automatically.</source>
+        <translation>Finder·탐색기에서 파일이나 폴더를 복사한 뒤, 상대 컴퓨터에서 Cmd+V 또는 Ctrl+V로 붙여넣으세요. Deskflow가 자동으로 전송합니다.</translation>
+    </message>
+    <message>
+        <source>Received files:</source>
+        <translation>받은 파일 위치:</translation>
+    </message>
+    <message>
+        <source>Save</source>
+        <translation>저장</translation>
+    </message>
+    <message>
+        <source>Cancel transfer</source>
+        <translation>전송 취소</translation>
+    </message>
+    <message>
+        <source>Received files</source>
+        <translation>받은 파일</translation>
+    </message>
+    <message>
+        <source>Choose an absolute folder for received files.</source>
+        <translation>받은 파일을 저장할 폴더의 전체 경로를 지정하세요.</translation>
+    </message>
+    <message>
+        <source>File sharing settings saved.</source>
+        <translation>파일 공유 설정을 저장했습니다.</translation>
+    </message>
+    <message>
+        <source>File sharing preview</source>
+        <translation>파일 공유 미리보기</translation>
+    </message>
+    <message>
+        <source>Cannot create the file sharing TLS certificate.</source>
+        <translation>파일 공유용 TLS 인증서를 만들지 못했습니다.</translation>
+    </message>
+    <message>
+        <source>Enable Deskflow encryption and peer verification to share files by copy and paste.</source>
+        <translation>파일을 복사·붙여넣기로 공유하려면 Deskflow의 암호화와 상대 컴퓨터 인증서 확인을 켜세요.</translation>
+    </message>
+    <message>
+        <source>Ready. Copy a file in Finder / Explorer and paste on the other computer.</source>
+        <translation>준비됐습니다. Finder·탐색기에서 파일을 복사하고 상대 컴퓨터에서 붙여넣으세요.</translation>
+    </message>
+    <message>
+        <source>Receiving copied files…</source>
+        <translation>복사한 파일을 받는 중…</translation>
+    </message>
+    <message>
+        <source>Cannot connect to the other computer to receive copied files.</source>
+        <translation>복사한 파일을 받기 위해 상대 컴퓨터에 연결할 수 없습니다.</translation>
+    </message>
+    <message>
+        <source>The clipboard changed while files were being received.</source>
+        <translation>파일을 받는 동안 클립보드가 바뀌었습니다.</translation>
+    </message>
+    <message>
+        <source>Could not place the received files on the clipboard.</source>
+        <translation>받은 파일을 클립보드에 넣지 못했습니다.</translation>
+    </message>
+    <message>
+        <source>Could not prepare the file clipboard.</source>
+        <translation>파일 클립보드를 준비하지 못했습니다.</translation>
+    </message>
+    <message>
+        <source>Files are ready. Paste in Finder / Explorer.</source>
+        <translation>파일이 준비됐습니다. Finder·탐색기에서 붙여넣으세요.</translation>
+    </message>
+    <message>
+        <source>File transfer complete. Paste in Finder / Explorer.</source>
+        <translation>파일 전송이 끝났습니다. Finder·탐색기에서 붙여넣으세요.</translation>
+    </message>
+    <message>
+        <source>Copied files</source>
+        <translation>복사한 파일</translation>
+    </message>
+    <message>
+        <source>Connecting…</source>
+        <translation>연결 중…</translation>
     </message>
 </context>
 <context>
@@ -1704,6 +1784,14 @@ The sender has this computer&apos;s pairing code.</source>
         <source>Paste the other computer&apos;s pairing code in File Sharing settings.</source>
         <translation>파일 공유 설정에 상대 컴퓨터의 연결 코드를 붙여넣으세요.</translation>
     </message>
+    <message>
+        <source>Another file request is still running.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The file offer is invalid.</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>deskflow::gui::files::FileTransferSession</name>
@@ -1718,6 +1806,10 @@ The sender has this computer&apos;s pairing code.</source>
     <message>
         <source>The other computer&apos;s fingerprint does not match its pairing code. Pair again.</source>
         <translation>상대 컴퓨터의 인증서 지문이 연결 코드와 다릅니다. 연결 코드를 다시 교환하세요.</translation>
+    </message>
+    <message>
+        <source>The other computer&apos;s fingerprint does not match the file offer.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Cannot write to the transfer connection.</source>
@@ -1746,6 +1838,22 @@ The sender has this computer&apos;s pairing code.</source>
     <message>
         <source>The other computer cancelled or declined the transfer.</source>
         <translation>상대 컴퓨터가 전송을 취소하거나 거절했습니다.</translation>
+    </message>
+    <message>
+        <source>Invalid file request.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The copied files changed or the file request is not authorized.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The copied files changed before the request completed.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Manual file offers are unavailable in automatic file sharing mode.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>The pairing code is invalid. Pair the computers again.</source>

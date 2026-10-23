@@ -4,313 +4,441 @@
  */
 #include "FileSharingDialog.h"
 #include "FileClipboard.h"
+#include "common/FileClipboardBridge.h"
 #include "common/Settings.h"
 #include "gui/TlsUtility.h"
-#include <QCheckBox>
-#include <QClipboard>
+#include <QAbstractSocket>
 #include <QColor>
+#include <QDateTime>
 #include <QDesktopServices>
 #include <QDir>
-#include <QDragEnterEvent>
-#include <QDropEvent>
 #include <QFile>
 #include <QFileDialog>
-#include <QFileInfo>
-#include <QFormLayout>
-#include <QGuiApplication>
 #include <QHeaderView>
+#include <QJsonArray>
 #include <QLabel>
 #include <QLineEdit>
-#include <QMessageBox>
-#include <QMimeData>
 #include <QNetworkInterface>
 #include <QPushButton>
+#include <QSet>
 #include <QSpinBox>
-#include <QStandardPaths>
 #include <QTreeWidget>
+#include <QUrl>
 #include <QVBoxLayout>
 
 namespace deskflow::gui::files {
-FileSharingDialog::FileSharingDialog(QWidget *parent, const QString &settingsPath)
+namespace {
+QString identity(const QJsonObject &object)
+{
+  return object.value("key").toString() + ':' + object.value("sequence").toString();
+}
+} // namespace
+
+FileSharingDialog::FileSharingDialog(QWidget *parent, const QString &settingsPath, bool autoStart)
     : QDialog(parent),
       m_settingsPath(settingsPath.isEmpty() ? FileSharingSettings::storagePath() : settingsPath),
       m_settings(FileSharingSettings::load(m_settingsPath))
 {
-  setWindowTitle(tr("File Sharing"));
+  setWindowTitle(tr("File sharing"));
   setObjectName("FileSharingDialog");
-  setAcceptDrops(true);
-  resize(760, 650);
+  resize(680, 440);
   auto *layout = new QVBoxLayout(this);
   auto *intro = new QLabel(
-      tr("Copy files or folders in Finder / Explorer, wait for transfer completion, then paste on the other computer.\n"
-         "Both computers must run this Deskflow fork with file sharing enabled."),
+      tr("Copy a file or folder in Finder / Explorer, then paste on the other computer with Cmd+V or Ctrl+V. "
+         "Deskflow transfers it automatically."),
       this
   );
   intro->setWordWrap(true);
   layout->addWidget(intro);
-  m_enabled = new QCheckBox(tr("Enable file sharing"), this);
-  m_enabled->setObjectName("enableFileSharing");
-  m_enabled->setChecked(m_settings.enabled);
-  layout->addWidget(m_enabled);
-  auto *form = new QFormLayout;
-  form->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
-  m_host = new QLineEdit(this);
-  m_host->setObjectName("fileSharingAddress");
-  for (const auto &address : QNetworkInterface::allAddresses())
-    if (address.protocol() == QAbstractSocket::IPv4Protocol && !address.isLoopback() && !address.isLinkLocal()) {
-      m_host->setText(address.toString());
-      break;
-    }
-  m_host->setPlaceholderText(tr("This computer's LAN address"));
-  form->addRow(tr("My address:"), m_host);
-  m_port = new QSpinBox(this);
-  m_port->setRange(1024, 65535);
-  m_port->setValue(m_settings.port);
-  m_port->setMaximumWidth(180);
-  m_port->setObjectName("fileSharingPort");
-  form->addRow(tr("Receiving port:"), m_port);
-  m_peer = new QLineEdit(this);
-  m_peer->setObjectName("fileSharingPeer");
-  m_peer->setEchoMode(QLineEdit::PasswordEchoOnEdit);
-  m_peer->setText(m_settings.peerCode);
-  m_peer->setPlaceholderText(tr("Paste the other computer's pairing code"));
-  form->addRow(tr("Other computer:"), m_peer);
   auto *folderRow = new QHBoxLayout;
+  folderRow->addWidget(new QLabel(tr("Received files:"), this));
   m_folder = new QLineEdit(m_settings.receiveDirectory, this);
   m_folder->setObjectName("fileSharingFolder");
+  folderRow->addWidget(m_folder, 1);
   auto *browse = new QPushButton(tr("Browse…"), this);
-  folderRow->addWidget(m_folder);
   folderRow->addWidget(browse);
-  form->addRow(tr("Receive files in:"), folderRow);
+  layout->addLayout(folderRow);
+  auto *limitRow = new QHBoxLayout;
+  limitRow->addWidget(new QLabel(tr("Maximum transfer:"), this));
   m_limit = new QSpinBox(this);
+  m_limit->setObjectName("fileSharingLimit");
   m_limit->setRange(1, 1024 * 1024);
-  m_limit->setMaximumWidth(220);
   m_limit->setSuffix(tr(" MiB"));
   m_limit->setValue(int(m_settings.limit / (1024 * 1024)));
-  form->addRow(tr("Maximum transfer:"), m_limit);
-  layout->addLayout(form);
-  m_clipboard = new QCheckBox(tr("Automatically send files copied in Finder / Explorer to the other computer"), this);
-  m_clipboard->setObjectName("shareCopiedFiles");
-  m_clipboard->setChecked(m_settings.clipboard);
-  layout->addWidget(m_clipboard);
-  m_autoAccept = new QCheckBox(tr("Automatically accept requests using my pairing code"), this);
-  m_autoAccept->setChecked(m_settings.autoAccept);
-  layout->addWidget(m_autoAccept);
-  auto *pairingHelp = new QLabel(
-      tr("Keep pairing codes private. Copy this computer's code to the other computer, and paste its code here.\n"
-         "Incoming files require approval unless automatic acceptance is enabled. Original files are never moved or "
-         "deleted."),
-      this
-  );
-  pairingHelp->setWordWrap(true);
-  layout->addWidget(pairingHelp);
-  auto *settingsButtons = new QHBoxLayout;
-  auto *applyButton = new QPushButton(tr("Apply settings"), this);
-  applyButton->setObjectName("applyFileSharing");
-  m_copyCode = new QPushButton(tr("Copy my pairing code"), this);
-  m_copyCode->setObjectName("copyPairingCode");
-  auto *resetCode = new QPushButton(tr("Reset my pairing code"), this);
-  resetCode->setObjectName("resetPairingCode");
-  connect(resetCode, &QPushButton::clicked, this, [this] {
-    if (QMessageBox::question(
-            this, tr("Reset pairing code?"),
-            tr("Old codes will stop accepting incoming transfers. Copy the new code to the other computer."),
-            QMessageBox::Yes | QMessageBox::No, QMessageBox::No
-        ) != QMessageBox::Yes)
-      return;
-    auto next = m_settings;
-    next.key = FileSharingSettings::newKey();
-    QString error;
-    m_pendingFiles.clear();
-    const auto certificate = next.enabled ? Settings::value(Settings::Security::Certificate).toString() : QString();
-    if (!m_service.configure(next, certificate, error) || !next.save(m_settingsPath, error)) {
-      QString ignored;
-      m_service.configure(m_settings, certificate, ignored);
-      showError(error);
-      return;
-    }
-    m_settings = next;
-    m_seenClipboard = clipboardSequence();
-    m_status->setText(tr("Pairing code reset. Copy the new code to the other computer."));
-  });
-  settingsButtons->addWidget(applyButton);
-  settingsButtons->addWidget(m_copyCode);
-  settingsButtons->addWidget(resetCode);
-  settingsButtons->addStretch();
-  layout->addLayout(settingsButtons);
-  auto *sendButtons = new QHBoxLayout;
-  m_send = new QPushButton(tr("Send files…"), this);
-  m_send->setObjectName("sendFiles");
-  m_sendFolder = new QPushButton(tr("Send folder…"), this);
-  auto *cancel = new QPushButton(tr("Cancel transfers"), this);
-  sendButtons->addWidget(m_send);
-  sendButtons->addWidget(m_sendFolder);
-  sendButtons->addWidget(cancel);
-  layout->addLayout(sendButtons);
+  limitRow->addWidget(m_limit);
+  limitRow->addStretch();
+  auto *save = new QPushButton(tr("Save"), this);
+  save->setObjectName("applyFileSharing");
+  limitRow->addWidget(save);
+  layout->addLayout(limitRow);
   m_transfers = new QTreeWidget(this);
   m_transfers->setObjectName("fileTransfers");
   m_transfers->setHeaderLabels({tr("Files"), tr("Direction"), tr("Progress / status")});
   m_transfers->header()->setSectionResizeMode(0, QHeaderView::Stretch);
   m_transfers->setRootIsDecorated(false);
   layout->addWidget(m_transfers, 1);
-  auto *receivedButtons = new QHBoxLayout;
-  m_copyReceived = new QPushButton(tr("Copy received files for pasting"), this);
-  m_copyReceived->setEnabled(false);
-  m_openReceived = new QPushButton(tr("Open received folder"), this);
-  m_openReceived->setEnabled(false);
-  receivedButtons->addWidget(m_copyReceived);
-  receivedButtons->addWidget(m_openReceived);
-  layout->addLayout(receivedButtons);
+  auto *actions = new QHBoxLayout;
+  auto *open = new QPushButton(tr("Open received folder"), this);
+  open->setObjectName("openReceivedFolder");
+  actions->addWidget(open);
+  auto *cancel = new QPushButton(tr("Cancel transfer"), this);
+  actions->addWidget(cancel);
+  actions->addStretch();
+  auto *close = new QPushButton(tr("Close"), this);
+  actions->addWidget(close);
+  layout->addLayout(actions);
   m_status = new QLabel(this);
-  m_status->setTextFormat(Qt::PlainText);
   m_status->setObjectName("fileSharingStatus");
+  m_status->setTextFormat(Qt::PlainText);
   m_status->setWordWrap(true);
   layout->addWidget(m_status);
-  auto *closeButton = new QPushButton(tr("Close"), this);
-  layout->addWidget(closeButton, 0, Qt::AlignRight);
-  connect(closeButton, &QPushButton::clicked, this, &QDialog::hide);
-  connect(applyButton, &QPushButton::clicked, this, &FileSharingDialog::apply);
+
   connect(browse, &QPushButton::clicked, this, [this] {
-    const auto path = QFileDialog::getExistingDirectory(this, tr("Receive files in"), m_folder->text());
+    const auto path = QFileDialog::getExistingDirectory(this, tr("Received files"), m_folder->text());
     if (!path.isEmpty())
       m_folder->setText(path);
   });
-  connect(m_copyCode, &QPushButton::clicked, this, [this] {
-    const auto code = m_service.pairingCode(m_host->text());
-    if (code.isEmpty()) {
-      showError(tr("Apply settings and enter this computer's reachable address first."));
+  connect(save, &QPushButton::clicked, this, [this] {
+    const auto folder = m_folder->text().trimmed();
+    if (!QDir::isAbsolutePath(folder)) {
+      showError(tr("Choose an absolute folder for received files."));
       return;
     }
-    QGuiApplication::clipboard()->setText(code);
-    m_seenClipboard = clipboardSequence();
-    m_status->setText(tr("Pairing code copied. Paste it only on the other computer."));
+    m_settings.receiveDirectory = folder;
+    m_settings.limit = qint64(m_limit->value()) * 1024 * 1024;
+    QString error;
+    if (!m_settings.save(m_settingsPath, error))
+      showError(error);
+    else {
+      m_service.setLimit(m_settings.limit);
+      m_status->setText(tr("File sharing settings saved."));
+    }
   });
-  connect(m_send, &QPushButton::clicked, this, [this] {
-    const auto paths = QFileDialog::getOpenFileNames(this, tr("Send files"));
-    if (!paths.isEmpty())
-      sendFiles(paths);
-  });
-  connect(m_sendFolder, &QPushButton::clicked, this, [this] {
-    const auto path = QFileDialog::getExistingDirectory(this, tr("Send folder"));
-    if (!path.isEmpty())
-      sendFiles({path});
+  connect(open, &QPushButton::clicked, this, [this] {
+    QDesktopServices::openUrl(QUrl::fromLocalFile(m_settings.receiveDirectory));
   });
   connect(cancel, &QPushButton::clicked, this, [this] {
-    m_pendingFiles.clear();
-    m_service.cancelAll();
+    if (m_pullSession)
+      m_pullSession->cancel();
   });
-  connect(m_copyReceived, &QPushButton::clicked, this, &FileSharingDialog::copyReceived);
-  connect(m_openReceived, &QPushButton::clicked, this, [this] {
-    if (!m_receivedFiles.isEmpty())
-      QDesktopServices::openUrl(QUrl::fromLocalFile(QFileInfo(m_receivedFiles.first()).absolutePath()));
-  });
+  connect(close, &QPushButton::clicked, this, &QDialog::hide);
   connect(&m_service, &FileTransferService::started, this, &FileSharingDialog::watch);
-  connect(&m_service, &FileTransferService::incoming, this, &FileSharingDialog::incoming);
-  connect(&m_poll, &QTimer::timeout, this, &FileSharingDialog::pollClipboard);
-  m_poll.start(750);
+  connect(&m_poll, &QTimer::timeout, this, &FileSharingDialog::poll);
+  connect(&m_endpointRefresh, &QTimer::timeout, this, &FileSharingDialog::refreshEndpoint);
+  connect(Settings::instance(), &Settings::settingsChanged, this, [this](const QString &key) {
+    if (key != Settings::Security::TlsEnabled && key != Settings::Security::CheckPeers)
+      return;
+    const bool secure = TlsUtility::isEnabled() && Settings::value(Settings::Security::CheckPeers).toBool();
+    if (secure) {
+      if (!m_started)
+        start();
+      else
+        refreshEndpoint();
+    } else {
+      QFile::remove(deskflow::files::FileClipboardBridge::endpointPath());
+      deskflow::files::FileClipboardBridge::clearSourceOffer();
+      deskflow::files::FileClipboardBridge::clearIncomingOffer();
+      deskflow::files::FileClipboardBridge::clearIncomingStatus();
+      m_service.clearPullOffer();
+      if (m_pullSession)
+        m_pullSession->cancel();
+    }
+  });
   m_seenClipboard = clipboardSequence();
-  QString error;
-  if (m_settings.enabled &&
-      !m_service.configure(m_settings, Settings::value(Settings::Security::Certificate).toString(), error)) {
-    m_status->setText(tr("File sharing could not start: %1").arg(error));
-  } else
-    m_status->setText(
-        m_settings.enabled ? tr("File sharing ready. Drop files here to send them.") : tr("File sharing is disabled.")
-    );
-  m_copyCode->setEnabled(m_settings.enabled && m_service.port());
-  m_send->setEnabled(m_settings.enabled);
-  m_sendFolder->setEnabled(m_settings.enabled);
+  if (autoStart)
+    start();
+  else
+    m_status->setText(tr("File sharing preview"));
 }
+
 FileSharingDialog::~FileSharingDialog()
 {
   m_poll.stop();
-  m_pendingFiles.clear();
+  m_endpointRefresh.stop();
   m_service.cancelAll();
+  if (m_started)
+    QFile::remove(deskflow::files::FileClipboardBridge::endpointPath());
 }
-void FileSharingDialog::apply()
+
+void FileSharingDialog::start()
 {
-  auto next = m_settings;
-  next.enabled = m_enabled->isChecked();
-  next.clipboard = m_clipboard->isChecked();
-  next.autoAccept = m_autoAccept->isChecked();
-  next.port = quint16(m_port->value());
-  next.limit = qint64(m_limit->value()) * 1024 * 1024;
-  next.receiveDirectory = m_folder->text().trimmed();
-  next.peerCode = m_peer->text().trimmed();
-  QUrl peer;
-  QByteArray fingerprint, key;
-  if ((!next.peerCode.isEmpty() && !FileSharingSettings::parsePeer(next.peerCode, peer, fingerprint, key)) ||
-      (next.enabled && (next.receiveDirectory.isEmpty() || !QDir::isAbsolutePath(next.receiveDirectory))) ||
-      (next.enabled && next.clipboard && next.peerCode.isEmpty())) {
-    showError(tr("Choose an absolute receiving folder and a valid peer pairing code for clipboard sharing."));
+  QFile::remove(deskflow::files::FileClipboardBridge::endpointPath());
+  deskflow::files::FileClipboardBridge::clearSourceOffer();
+  // The one-time file capability is carried by Deskflow's clipboard channel.
+  // Do not advertise it when that channel can run without peer-authenticated TLS.
+  if (!TlsUtility::isEnabled() || !Settings::value(Settings::Security::CheckPeers).toBool()) {
+    showError(tr("Enable Deskflow encryption and peer verification to share files by copy and paste."));
     return;
   }
-  if (next.enabled && !QFile::exists(Settings::value(Settings::Security::Certificate).toString()) &&
-      !TlsUtility::generateCertificate()) {
-    showError(tr("Cannot generate the TLS certificate."));
+  deskflow::files::FileClipboardBridge::clearIncomingOffer();
+  deskflow::files::FileClipboardBridge::clearIncomingStatus();
+  m_settings.enabled = true;
+  m_settings.clipboard = true;
+  m_settings.autoAccept = true;
+  m_settings.peerCode.clear();
+  // The MSI's private-network firewall rule permits this port for Deskflow.
+  m_settings.port = 24801;
+  const auto certificate = Settings::value(Settings::Security::Certificate).toString();
+  if (!QFile::exists(certificate) && !TlsUtility::generateCertificate()) {
+    showError(tr("Cannot create the file sharing TLS certificate."));
     return;
   }
   QString error;
-  m_pendingFiles.clear();
-  if (!m_service.configure(
-          next, next.enabled ? Settings::value(Settings::Security::Certificate).toString() : QString(), error
-      )) {
-    QString restoreError;
-    m_service.configure(
-        m_settings, m_settings.enabled ? Settings::value(Settings::Security::Certificate).toString() : QString(),
-        restoreError
-    );
+  m_service.setPullEnabled(true);
+  if (!m_service.configure(m_settings, certificate, error)) {
+    showError(tr("File sharing could not start: %1").arg(error));
+    return;
+  }
+  m_started = true;
+  refreshEndpoint();
+  m_endpointRefresh.start(1000);
+  m_poll.start(50);
+  m_status->setText(tr("Ready. Copy a file in Finder / Explorer and paste on the other computer."));
+}
+
+void FileSharingDialog::refreshEndpoint()
+{
+  if (!m_started || !m_service.port())
+    return;
+  if (!TlsUtility::isEnabled() || !Settings::value(Settings::Security::CheckPeers).toBool()) {
+    QFile::remove(deskflow::files::FileClipboardBridge::endpointPath());
+    m_service.clearPullOffer();
+    return;
+  }
+  QJsonArray addresses;
+  QSet<QString> seen;
+  for (const auto &network : QNetworkInterface::allInterfaces()) {
+    if (!(network.flags() & QNetworkInterface::IsUp) || !(network.flags() & QNetworkInterface::IsRunning))
+      continue;
+    for (const auto &entry : network.addressEntries()) {
+      const auto address = entry.ip();
+      if (address.isNull() || address.isLoopback())
+        continue;
+      if (address.protocol() != QAbstractSocket::IPv4Protocol && address.protocol() != QAbstractSocket::IPv6Protocol)
+        continue;
+      if (address.protocol() == QAbstractSocket::IPv6Protocol && address.isLinkLocal())
+        continue;
+      const auto text = address.toString();
+      if (!seen.contains(text) && addresses.size() < 7) {
+        addresses.append(text);
+        seen.insert(text);
+      }
+    }
+  }
+  addresses.append(QStringLiteral("127.0.0.1"));
+  const QJsonObject endpoint{
+      {"version", 2},
+      {"updatedMs", QDateTime::currentMSecsSinceEpoch()},
+      {"addresses", addresses},
+      {"port", int(m_service.port())},
+      {"pin", QString::fromLatin1(TlsUtility::certFingerprint().toHex())},
+      {"key", QString::fromLatin1(m_settings.key)}
+  };
+  QString error;
+  if (!deskflow::files::FileClipboardBridge::writeEndpoint(endpoint, &error))
     showError(error);
+}
+
+void FileSharingDialog::poll()
+{
+  if (!m_started)
+    return;
+  if (!TlsUtility::isEnabled() || !Settings::value(Settings::Security::CheckPeers).toBool()) {
+    m_service.clearPullOffer();
     return;
   }
-  if (!next.save(m_settingsPath, error)) {
-    auto disabled = next;
-    disabled.enabled = false;
-    m_service.configure(disabled, {}, error);
-    m_settings.enabled = false;
-    m_enabled->setChecked(false);
-    m_copyCode->setEnabled(false);
-    m_send->setEnabled(false);
-    m_sendFolder->setEnabled(false);
-    showError(tr("Settings could not be saved securely. File sharing has been stopped."));
+  if (m_pullSession && QDateTime::currentMSecsSinceEpoch() - m_statusRefreshedAt > 30000)
+    setOfferStatus("pending");
+  const auto sequence = clipboardSequence();
+  if (sequence != m_seenClipboard) {
+    m_seenClipboard = sequence;
+    if (m_pullSession && sequence != m_clipboardBeforePull) {
+      ++m_pullGeneration;
+      auto *session = m_pullSession.data();
+      m_pullSession.clear();
+      session->cancel();
+      deskflow::files::FileClipboardBridge::clearIncomingOffer();
+      deskflow::files::FileClipboardBridge::clearIncomingStatus();
+      m_offer = {};
+    }
+    if (!m_pullSession && !deskflow::files::FileClipboardBridge::isSuppressedSequence(sequence)) {
+      ++m_pullGeneration;
+      deskflow::files::FileClipboardBridge::clearIncomingOffer();
+      deskflow::files::FileClipboardBridge::clearIncomingStatus();
+      m_offer = {};
+    }
+  }
+  QJsonObject source;
+  if (deskflow::files::FileClipboardBridge::readSourceOffer(source) &&
+      source.value("sequence").toString() == QString::number(sequence) && !copiedFiles().isEmpty())
+    m_service.setPullOffer(source.value("key").toString().toLatin1(), sequence);
+  else
+    m_service.setPullOffer({}, 0);
+
+  QJsonObject incoming, status;
+  const bool pending = deskflow::files::FileClipboardBridge::readIncomingOffer(incoming) &&
+                       deskflow::files::FileClipboardBridge::readIncomingStatus(status) &&
+                       status.value("state").toString() == QLatin1String("pending") &&
+                       identity(status) == identity(incoming);
+  if (pending && identity(m_offer) != identity(incoming)) {
+    if (m_pullSession) {
+      ++m_pullGeneration;
+      auto *session = m_pullSession.data();
+      m_pullSession.clear();
+      session->cancel();
+    }
+    beginPull(incoming);
+  }
+}
+
+void FileSharingDialog::beginPull(const QJsonObject &offer)
+{
+  ++m_pullGeneration;
+  m_offer = offer;
+  m_clipboardBeforePull = clipboardSequence();
+  m_nextAddress = 0;
+  m_retryCycle = 0;
+  m_status->setText(tr("Receiving copied files…"));
+  tryNextAddress();
+}
+
+void FileSharingDialog::tryNextAddress()
+{
+  if (m_offer.isEmpty())
+    return;
+  const auto generation = m_pullGeneration;
+  const auto addresses = m_offer.value("addresses").toArray();
+  if (m_nextAddress >= addresses.size()) {
+    if (m_retryCycle++ == 0) {
+      m_nextAddress = 0;
+      QTimer::singleShot(150, this, [this, generation] {
+        if (generation == m_pullGeneration)
+          tryNextAddress();
+      });
+      return;
+    }
+    finishPull(false, tr("Cannot connect to the other computer to receive copied files."));
     return;
   }
-  m_settings = next;
-  m_seenClipboard = clipboardSequence();
-  m_pendingFiles.clear();
-  m_copyCode->setEnabled(next.enabled);
-  m_send->setEnabled(next.enabled);
-  m_sendFolder->setEnabled(next.enabled);
-  m_status->setText(
-      next.enabled ? tr("Ready on port %1. Exchange pairing codes on both computers.").arg(m_service.port())
-                   : tr("File sharing is disabled.")
+  QUrl peer;
+  peer.setScheme(QStringLiteral("deskflow-files"));
+  peer.setHost(addresses.at(m_nextAddress++).toString());
+  peer.setPort(m_offer.value("port").toInt());
+  QString error;
+  auto *session = m_service.requestFiles(
+      peer, m_offer.value("key").toString().toLatin1(), m_offer.value("pin").toString().toLatin1(),
+      m_offer.value("sequence").toString().toULongLong(), m_settings.limit, error
+  );
+  if (!session) {
+    QTimer::singleShot(0, this, [this, generation] {
+      if (generation == m_pullGeneration)
+        tryNextAddress();
+    });
+    return;
+  }
+  m_pullSession = session;
+  connect(session, &FileTransferSession::offered, this, [this, session, generation] {
+    if (generation == m_pullGeneration && m_pullSession == session)
+      session->accept(m_settings.receiveDirectory);
+  });
+  connect(session, &FileTransferSession::completed, this, [this, session, generation](const QStringList &paths) {
+    if (generation != m_pullGeneration || m_pullSession != session)
+      return;
+    QJsonObject current;
+    if (!deskflow::files::FileClipboardBridge::readIncomingOffer(current) || identity(current) != identity(m_offer))
+      return;
+    if (clipboardSequence() != m_clipboardBeforePull) {
+      finishPull(false, tr("The clipboard changed while files were being received."));
+      return;
+    }
+    m_receivedFiles = paths;
+    if (!deskflow::files::FileClipboardBridge::beginNativePublication()) {
+      finishPull(false, tr("Could not prepare the file clipboard."));
+      return;
+    }
+    const bool published = publishFiles(paths);
+    const auto nativeSequence = published ? clipboardSequence() : 0;
+    const bool suppressed = published && deskflow::files::FileClipboardBridge::writeSuppressedSequence(nativeSequence);
+    deskflow::files::FileClipboardBridge::endNativePublication();
+    if (!published || !suppressed) {
+      finishPull(false, tr("Could not place the received files on the clipboard."));
+      return;
+    }
+    m_seenClipboard = nativeSequence;
+    setOfferStatus("ready");
+    m_status->setText(tr("Files are ready. Paste in Finder / Explorer."));
+    Q_EMIT notification(tr("File transfer complete. Paste in Finder / Explorer."));
+  });
+  connect(
+      session, &FileTransferSession::finished, this,
+      [this, session, generation](bool success, const QString &message) {
+        if (generation != m_pullGeneration || m_pullSession != session)
+          return;
+        m_pullSession.clear();
+        QJsonObject status;
+        const bool ready = deskflow::files::FileClipboardBridge::readIncomingStatus(status) &&
+                           status.value("state").toString() == QLatin1String("ready") &&
+                           identity(status) == identity(m_offer);
+        if (success || ready)
+          return;
+        if (clipboardSequence() != m_clipboardBeforePull) {
+          finishPull(false, tr("The clipboard changed while files were being received."));
+          return;
+        }
+        Q_UNUSED(message)
+        QTimer::singleShot(100, this, [this, generation] {
+          if (generation == m_pullGeneration)
+            tryNextAddress();
+        });
+      }
   );
 }
-void FileSharingDialog::sendFiles(const QStringList &paths)
+
+void FileSharingDialog::setOfferStatus(const char *state)
 {
+  if (m_offer.isEmpty())
+    return;
+  QJsonObject current;
+  if (!deskflow::files::FileClipboardBridge::readIncomingOffer(current) || identity(current) != identity(m_offer))
+    return;
+  const QJsonObject status{
+      {"version", 2},
+      {"sequence", m_offer.value("sequence")},
+      {"key", m_offer.value("key")},
+      {"state", QLatin1String(state)},
+      {"updatedMs", QDateTime::currentMSecsSinceEpoch()}
+  };
   QString error;
-  if (!m_service.sendFiles(paths, error))
+  if (!deskflow::files::FileClipboardBridge::writeIncomingStatus(status, &error))
     showError(error);
+  else
+    m_statusRefreshedAt = QDateTime::currentMSecsSinceEpoch();
 }
+
+void FileSharingDialog::finishPull(bool success, const QString &message)
+{
+  setOfferStatus(success ? "ready" : "failed");
+  m_status->setText(message);
+  if (!success)
+    Q_EMIT notification(message);
+}
+
 void FileSharingDialog::watch(FileTransferSession *session, bool outgoing)
 {
   auto *item = new QTreeWidgetItem(
-      m_transfers, {outgoing ? session->manifest().roots.join(", ") : tr("Incoming files"),
-                    outgoing ? tr("Sending") : tr("Receiving"), tr("Connecting / waiting for approval")}
+      m_transfers, {tr("Copied files"), outgoing ? tr("Sending") : tr("Receiving"), tr("Connecting…")}
   );
-  // Keep active rows stable while allowing bounded history.
-  if (m_transfers->topLevelItemCount() > 100) {
+  if (m_transfers->topLevelItemCount() > 100)
     for (int i = 0; i < m_transfers->topLevelItemCount(); ++i)
       if (m_transfers->topLevelItem(i)->data(0, Qt::UserRole).toBool()) {
         delete m_transfers->takeTopLevelItem(i);
         break;
       }
-  }
   connect(session, &FileTransferSession::offered, this, [session, item] {
     item->setText(0, session->manifest().roots.join(", "));
   });
-  connect(session, &FileTransferSession::statusChanged, this, [item](const QString &message) {
-    item->setText(2, message);
+  connect(session, &FileTransferSession::statusChanged, this, [item](const QString &status) {
+    item->setText(2, status);
   });
   connect(session, &FileTransferSession::progress, this, [item](qint64 done, qint64 total) {
     item->setText(
@@ -320,122 +448,16 @@ void FileSharingDialog::watch(FileTransferSession *session, bool outgoing)
                .arg(total ? done * 100 / total : 100)
     );
   });
-  connect(
-      session, &FileTransferSession::finished, this,
-      [this, item, outgoing, session](bool success, const QString &message) {
-        item->setText(2, message);
-        item->setData(0, Qt::UserRole, true);
-        item->setForeground(2, success ? QColor(Qt::darkGreen) : QColor(Qt::red));
-        if (!success || outgoing)
-          m_status->setText(message);
-        if (outgoing || (!success && !session->manifest().roots.isEmpty()))
-          Q_EMIT notification(message);
-        if (outgoing && !m_pendingFiles.isEmpty()) {
-          const auto pending = m_pendingFiles;
-          const auto sequence = m_pendingSequence;
-          m_pendingFiles.clear();
-          QTimer::singleShot(0, this, [this, pending, sequence] {
-            if (m_settings.enabled && m_settings.clipboard && clipboardSequence() == sequence)
-              sendFiles(pending);
-          });
-        }
-      }
-  );
-}
-void FileSharingDialog::incoming(FileTransferSession *session)
-{
-  const auto before = clipboardSequence();
-  connect(session, &FileTransferSession::completed, this, [this, before](const QStringList &paths) {
-    m_receivedFiles = paths;
-    m_copyReceived->setEnabled(true);
-    m_openReceived->setEnabled(true);
-    if (clipboardSequence() == before)
-      copyReceived();
-    else
-      m_status->setText(tr("Files received. The clipboard changed; use ‘Copy received files’ to prepare pasting."));
-    Q_EMIT notification(tr("Files received. Open File Sharing or paste in Finder / Explorer once ready."));
+  connect(session, &FileTransferSession::finished, this, [item](bool success, const QString &message) {
+    item->setText(2, message);
+    item->setData(0, Qt::UserRole, true);
+    item->setForeground(2, success ? QColor(Qt::darkGreen) : QColor(Qt::red));
   });
-  const auto accept = [this, session] { session->accept(m_settings.receiveDirectory); };
-  if (m_settings.autoAccept) {
-    accept();
-    return;
-  }
-  show();
-  raise();
-  activateWindow();
-  auto *prompt = new QMessageBox(
-      QMessageBox::Question, tr("Receive files?"),
-      tr("Receive %1 into %2?\nTotal: %3 MiB\nThe sender has this computer's pairing code.")
-          .arg(session->manifest().roots.join(", "), m_settings.receiveDirectory)
-          .arg(double(session->manifest().totalBytes) / (1024 * 1024), 0, 'f', 1),
-      QMessageBox::Yes | QMessageBox::No, this
-  );
-  prompt->setTextFormat(Qt::PlainText);
-  prompt->setDefaultButton(QMessageBox::No);
-  prompt->setAttribute(Qt::WA_DeleteOnClose);
-  QPointer<FileTransferSession> guard(session);
-  connect(prompt, &QMessageBox::finished, this, [this, guard](int result) {
-    if (guard) {
-      if (result == QMessageBox::Yes)
-        guard->accept(m_settings.receiveDirectory);
-      else
-        guard->reject();
-    }
-  });
-  connect(session, &FileTransferSession::finished, prompt, &QMessageBox::reject);
-  prompt->open();
 }
-void FileSharingDialog::copyReceived()
+
+void FileSharingDialog::showError(const QString &message)
 {
-  if (publishFiles(m_receivedFiles)) {
-    m_seenClipboard = clipboardSequence();
-    m_pendingFiles.clear();
-    m_status->setText(tr("Files are ready. Paste in Finder / Explorer on this computer."));
-  }
-}
-void FileSharingDialog::pollClipboard()
-{
-  const auto sequence = clipboardSequence();
-  if (sequence == m_seenClipboard)
-    return;
-  m_seenClipboard = sequence;
-  if (!m_settings.enabled || !m_settings.clipboard)
-    return;
-  const auto paths = copiedFiles();
-  if (paths.isEmpty()) {
-    m_pendingFiles.clear();
-    return;
-  }
-  if (m_service.sending()) {
-    m_pendingFiles = paths;
-    m_pendingSequence = sequence;
-    return;
-  }
-  sendFiles(paths);
-}
-void FileSharingDialog::showError(const QString &error)
-{
-  m_status->setText(error);
-  if (isVisible())
-    QMessageBox::warning(this, tr("File sharing"), error);
-}
-void FileSharingDialog::dragEnterEvent(QDragEnterEvent *event)
-{
-  if (m_settings.enabled && event->mimeData()->hasUrls()) {
-    event->setDropAction(Qt::CopyAction);
-    event->accept();
-  }
-}
-void FileSharingDialog::dropEvent(QDropEvent *event)
-{
-  QStringList paths;
-  for (const auto &url : event->mimeData()->urls())
-    if (url.isLocalFile())
-      paths.append(url.toLocalFile());
-  if (!paths.isEmpty()) {
-    sendFiles(paths);
-    event->setDropAction(Qt::CopyAction);
-    event->accept();
-  }
+  m_status->setText(message);
+  Q_EMIT notification(message);
 }
 } // namespace deskflow::gui::files

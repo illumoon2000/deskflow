@@ -12,6 +12,7 @@
 #include "platform/MSWindowsHook.h"
 #include "platform/MSWindowsPowerManager.h"
 
+#include <chrono>
 #include <map>
 #include <string>
 
@@ -174,6 +175,9 @@ private: // HACK
   bool onScreensaver(bool activated);
   bool onDisplayChange();
   void onClipboardChange();
+  void beginLocalFilePaste(HWND foreground, HWND focus);
+  void pollLocalFilePaste();
+  void finishLocalFilePaste(bool disarm, const char *reason);
 
   // warp cursor without discarding queued events
   void warpCursorNoFlush(int32_t x, int32_t y);
@@ -289,6 +293,15 @@ private:
 
   // timer for periodically checking stuff that requires polling
   EventQueueTimer *m_fixTimer = nullptr;
+  EventQueueTimer *m_filePasteTimer = nullptr;
+  std::chrono::steady_clock::time_point m_filePasteDeadline;
+  std::string m_filePasteSequence;
+  std::string m_filePasteKey;
+  DWORD m_filePasteOfferClipboardSequence = 0;
+  DWORD m_filePasteInitialClipboardSequence = 0;
+  uint32_t m_filePasteInitialInteractionSerial = 0;
+  HWND m_filePasteForeground = nullptr;
+  HWND m_filePasteFocus = nullptr;
 
   // the keyboard layout to use when off primary computer
   HKL m_keyLayout = nullptr;

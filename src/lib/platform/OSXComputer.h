@@ -19,9 +19,12 @@
 #include <mach/mach_interface.h>
 #include <mach/mach_port.h>
 
+#include <atomic>
 #include <bitset>
+#include <chrono>
 #include <map>
 #include <memory>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -123,6 +126,8 @@ private:
   void constructMouseButtonEventMap();
 
   bool onKey(CGEventRef event);
+  void pollLocalFilePaste();
+  void finishLocalFilePaste(bool disarm, const char *reason);
 
   void onMediaKey(CGEventRef event);
 
@@ -222,7 +227,7 @@ private:
   bool m_isPrimary;
 
   // true if mouse has entered the screen
-  bool m_isOnComputer;
+  std::atomic<bool> m_isOnComputer;
 
   // the display
   CGDirectDisplayID m_displayID;
@@ -266,6 +271,24 @@ private:
   // clipboard stuff
   bool m_ownClipboard;
   EventQueueTimer *m_clipboardTimer;
+  EventQueueTimer *m_filePasteTimer = nullptr;
+  std::atomic<bool> m_filePastePending{false};
+  std::atomic<bool> m_filePasteSuppressV{false};
+  std::atomic<bool> m_filePasteRequested{false};
+  std::atomic<uint64_t> m_filePasteInteractionSerial{0};
+  std::atomic<uint64_t> m_filePasteStartSerial{0};
+  std::atomic<pid_t> m_filePasteTargetPid{0};
+  bool m_filePasteActive = false;
+  std::chrono::steady_clock::time_point m_filePasteDeadline;
+  std::string m_filePasteSequence;
+  std::string m_filePasteKey;
+  uint64_t m_filePasteOfferClipboardSequence = 0;
+  uint64_t m_filePasteInitialClipboardSequence = 0;
+  uint64_t m_filePasteInitialInteractionSerial = 0;
+  pid_t m_filePasteInitialPid = 0;
+  CFTypeRef m_filePasteFocus = nullptr;
+  bool m_filePasteFocusIsWindow = false;
+  std::chrono::steady_clock::time_point m_filePasteNextFocusCheck;
 
   EventQueueTimer *m_axTimer;
 

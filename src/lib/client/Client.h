@@ -16,7 +16,10 @@
 #include "deskflow/IClipboard.h"
 #include "net/NetworkAddress.h"
 
+#include <QString>
+#include <chrono>
 #include <climits>
+#include <optional>
 #include <string>
 
 class Event;
@@ -216,6 +219,9 @@ private:
   void handleHello();
   void handleSuspend();
   void handleResume();
+  void checkDeferredPaste();
+  void cancelDeferredPaste();
+  void stopDeferredPasteTimer();
   void sendClipboardThread(void *);
   void bindNetworkInterface(IDataSocket *socket) const;
 
@@ -226,7 +232,21 @@ private:
   deskflow::Computer *m_computer = nullptr;
   deskflow::IStream *m_stream = nullptr;
   EventQueueTimer *m_timer = nullptr;
+  EventQueueTimer *m_deferredPasteTimer = nullptr;
   ServerProxy *m_server = nullptr;
+  struct DeferredPaste
+  {
+    KeyID id = kKeyNone;
+    KeyModifierMask mask = 0;
+    KeyButton button = 0;
+    std::string language;
+    QString sequence;
+    QString key;
+    std::chrono::steady_clock::time_point deadline;
+    bool released = false;
+  };
+  std::optional<DeferredPaste> m_deferredPaste;
+  KeyButton m_suppressedPasteRelease = 0;
   bool m_ready = false;
   bool m_active = false;
   bool m_suspended = false;

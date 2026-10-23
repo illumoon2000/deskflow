@@ -21,9 +21,10 @@
 #define DESKFLOW_MSG_PRE_WARP WM_APP + 0x0017     // x; y
 #define DESKFLOW_MSG_SCREEN_SAVER WM_APP + 0x0018 // activated; <unused>
 #define DESKFLOW_MSG_DEBUG WM_APP + 0x0019        // data, data
+#define DESKFLOW_MSG_FILE_PASTE WM_APP + 0x001A   // foreground HWND; focused HWND
 #define DESKFLOW_MSG_INPUT_FIRST DESKFLOW_MSG_KEY
 #define DESKFLOW_MSG_INPUT_LAST DESKFLOW_MSG_PRE_WARP
-#define DESKFLOW_HOOK_LAST_MSG DESKFLOW_MSG_DEBUG
+#define DESKFLOW_HOOK_LAST_MSG DESKFLOW_MSG_FILE_PASTE
 
 #define DESKFLOW_HOOK_FAKE_INPUT_VIRTUAL_KEY VK_CANCEL
 #define DESKFLOW_HOOK_FAKE_INPUT_SCANCODE 0
@@ -47,6 +48,7 @@ class MSWindowsHook
 {
 public:
   static constexpr int kVirtualKeyCount = 256;
+  static constexpr ULONG_PTR kFilePasteReplayTag = static_cast<ULONG_PTR>(0x44534650u);
 
   MSWindowsHook() = default;
   ~MSWindowsHook();
@@ -63,6 +65,14 @@ public:
   void setZone(int32_t x, int32_t y, int32_t w, int32_t h, int32_t jumpZoneSize);
 
   void setMode(EHookMode mode);
+
+  // Shared with the low-level keyboard hook. These operations never access the
+  // GUI/core bridge or block the hook while a file transfer is in progress.
+  static void setFilePastePending(bool pending);
+  static bool isFilePasteVDown();
+  static uint32_t filePasteInteractionSerial();
+  static uint32_t filePasteStartSerial();
+  static void clearFilePasteRequest();
 
   //! Copy the hook's physical key state; false until it has observed an event.
   static bool getPhysicalKeyState(BYTE keys[kVirtualKeyCount]);

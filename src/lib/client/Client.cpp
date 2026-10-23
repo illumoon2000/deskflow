@@ -14,6 +14,7 @@
 #include "client/ServerProxy.h"
 #include "client/ServerProxy1_7.h"
 #include "client/ServerProxy1_8.h"
+#include "common/FileClipboardBridge.h"
 #include "common/NetworkProtocol.h"
 #include "common/Settings.h"
 #include "deskflow/Clipboard.h"
@@ -30,10 +31,44 @@
 #include "net/SecureSocket.h"
 #include "net/TCPSocket.h"
 
+#include <QJsonObject>
 #include <QMetaEnum>
 
 #include <cstdlib>
 #include <cstring>
+
+namespace {
+
+constexpr auto deferredPastePollSeconds = 0.05;
+constexpr auto deferredPasteTimeout = std::chrono::minutes(10);
+
+#if defined(Q_OS_MACOS)
+constexpr auto pasteModifier = KeyModifierSuper;
+constexpr auto pasteModifierKey = kKeySuper_L;
+#elif defined(Q_OS_WIN)
+constexpr auto pasteModifier = KeyModifierControl;
+constexpr auto pasteModifierKey = kKeyControl_L;
+#endif
+
+bool isPasteShortcut(KeyID id, KeyModifierMask mask)
+{
+#if defined(Q_OS_MACOS) || defined(Q_OS_WIN)
+  constexpr auto otherModifiers = KeyModifierShift | KeyModifierControl | KeyModifierAlt | KeyModifierMeta |
+                                  KeyModifierSuper | KeyModifierAltGr | KeyModifierLevel5Lock;
+  return (id == 'v' || id == 'V') && (mask & pasteModifier) != 0 && (mask & (otherModifiers & ~pasteModifier)) == 0;
+#else
+  Q_UNUSED(id)
+  Q_UNUSED(mask)
+  return false;
+#endif
+}
+
+bool sameOffer(const QJsonObject &offer, const QJsonObject &status)
+{
+  return offer.value("sequence") == status.value("sequence") && offer.value("key") == status.value("key");
+}
+
+} // namespace
 
 //
 // Client
@@ -73,6 +108,7 @@ Client::Client(
 
 Client::~Client()
 {
+  cancelDeferredPaste();
   m_events->removeHandler(EventTypes::ComputerSuspend, getEventTarget());
   m_events->removeHandler(EventTypes::ComputerResume, getEventTarget());
 
@@ -230,6 +266,8 @@ void Client::enter(int32_t xAbs, int32_t yAbs, uint32_t, KeyModifierMask mask, b
 
 bool Client::leave()
 {
+  cancelDeferredPaste();
+  m_suppressedPasteRelease = 0;
   if (m_relativeMouseMoves) {
     saveRelativeRestorePosition();
   }
@@ -270,21 +308,142 @@ void Client::setClipboardDirty(ClipboardID, bool)
 
 void Client::keyDown(KeyID id, KeyModifierMask mask, KeyButton button, const std::string &lang)
 {
+  if (m_suppressedPasteRelease == button && button != 0)
+    return;
+  if (m_deferredPaste)
+    cancelDeferredPaste();
+
+  if (m_active && button != 0 && isPasteShortcut(id, mask)) {
+    QJsonObject offer;
+    QJsonObject status;
+    if (deskflow::files::FileClipboardBridge::readIncomingOffer(offer)) {
+      const bool matchingStatus =
+          deskflow::files::FileClipboardBridge::readIncomingStatus(status) && sameOffer(offer, status);
+      if (matchingStatus && status.value("state") == QLatin1String("ready")) {
+        m_computer->keyDown(id, mask, button, lang);
+        return;
+      }
+
+      // The core still has a remote file offer, so the native clipboard may
+      // contain unrelated previous data. Consume this entire shortcut even if
+      // the transfer failed or its status file is missing.
+      m_suppressedPasteRelease = button;
+      if (matchingStatus && status.value("state") == QLatin1String("pending")) {
+        m_deferredPaste = DeferredPaste{
+            id,
+            mask,
+            button,
+            lang,
+            offer.value("sequence").toString(),
+            offer.value("key").toString(),
+            std::chrono::steady_clock::now() + deferredPasteTimeout,
+            false
+        };
+        m_deferredPasteTimer = m_events->newTimer(deferredPastePollSeconds, nullptr);
+        m_events->addHandler(EventTypes::Timer, m_deferredPasteTimer, [this](const auto &) { checkDeferredPaste(); });
+        LOG_DEBUG("waiting for the copied remote files before pasting");
+      } else {
+        LOG_DEBUG("discarded file paste because the copied files are not ready");
+      }
+      return;
+    }
+  }
   m_computer->keyDown(id, mask, button, lang);
 }
 
 void Client::keyRepeat(KeyID id, KeyModifierMask mask, int32_t count, KeyButton button, const std::string &lang)
 {
+  if (m_suppressedPasteRelease == button && button != 0)
+    return;
   m_computer->keyRepeat(id, mask, count, button, lang);
 }
 
 void Client::keyUp(KeyID id, KeyModifierMask mask, KeyButton button)
 {
+  if (m_suppressedPasteRelease == button && button != 0) {
+    m_suppressedPasteRelease = 0;
+    if (m_deferredPaste && m_deferredPaste->button == button) {
+      m_deferredPaste->released = true;
+      checkDeferredPaste();
+    }
+    return;
+  }
   m_computer->keyUp(id, mask, button);
+}
+
+void Client::stopDeferredPasteTimer()
+{
+  if (m_deferredPasteTimer) {
+    m_events->removeHandler(EventTypes::Timer, m_deferredPasteTimer);
+    m_events->deleteTimer(m_deferredPasteTimer);
+    m_deferredPasteTimer = nullptr;
+  }
+}
+
+void Client::cancelDeferredPaste()
+{
+  stopDeferredPasteTimer();
+  m_deferredPaste.reset();
+  // If V is still held, its eventual key-up must not reach the remote computer
+  // without a matching key-down.
+}
+
+void Client::checkDeferredPaste()
+{
+  if (!m_deferredPaste)
+    return;
+  if (!m_active || !m_ready || !m_server || std::chrono::steady_clock::now() >= m_deferredPaste->deadline) {
+    LOG_DEBUG("cancelled a deferred file paste after leaving the computer or waiting too long");
+    cancelDeferredPaste();
+    return;
+  }
+
+  QJsonObject offer;
+  QJsonObject status;
+  if (!deskflow::files::FileClipboardBridge::readIncomingOffer(offer) ||
+      !deskflow::files::FileClipboardBridge::readIncomingStatus(status) || !sameOffer(offer, status) ||
+      status.value("sequence").toString() != m_deferredPaste->sequence ||
+      status.value("key").toString() != m_deferredPaste->key) {
+    LOG_DEBUG("cancelled a deferred file paste because the clipboard selection changed");
+    cancelDeferredPaste();
+    return;
+  }
+
+  const auto state = status.value("state").toString();
+  if (state == QLatin1String("pending"))
+    return;
+  if (state != QLatin1String("ready")) {
+    LOG_DEBUG("cancelled a deferred file paste because the transfer failed");
+    cancelDeferredPaste();
+    return;
+  }
+  if (!m_deferredPaste->released)
+    return;
+
+#if defined(Q_OS_MACOS) || defined(Q_OS_WIN)
+  const auto paste = *m_deferredPaste;
+  stopDeferredPasteTimer();
+  m_deferredPaste.reset();
+  m_suppressedPasteRelease = 0;
+
+  // The user may have released Ctrl/Command while the files transferred.
+  // Button zero is reserved by Deskflow and serves as a private, balanced
+  // modifier press for this one replayed shortcut.
+  const bool addModifier = (m_computer->getActiveModifiers() & pasteModifier) == 0;
+  if (addModifier)
+    m_computer->keyDown(pasteModifierKey, 0, 0, {});
+  m_computer->keyDown(paste.id, paste.mask, paste.button, paste.language);
+  m_computer->keyUp(paste.id, paste.mask, paste.button);
+  if (addModifier)
+    m_computer->keyUp(pasteModifierKey, 0, 0);
+  LOG_DEBUG("replayed the file paste after the remote clipboard became ready");
+#endif
 }
 
 void Client::mouseDown(ButtonID id)
 {
+  if (m_deferredPaste)
+    cancelDeferredPaste();
   m_computer->mouseDown(id);
 }
 
@@ -507,6 +666,8 @@ void Client::setupTimer()
 
 void Client::cleanup()
 {
+  cancelDeferredPaste();
+  m_suppressedPasteRelease = 0;
   m_connectOnResume = false;
   cleanupTimer();
   cleanupComputer();
@@ -539,6 +700,8 @@ void Client::cleanupConnection()
 
 void Client::cleanupComputer()
 {
+  cancelDeferredPaste();
+  m_suppressedPasteRelease = 0;
   if (m_server != nullptr) {
     if (m_ready) {
       m_computer->disable();

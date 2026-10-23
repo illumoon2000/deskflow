@@ -17,6 +17,7 @@
 #include "base/TMethodJob.h"
 #include "client/Client.h"
 #include "common/ExitCodes.h"
+#include "common/FileClipboardBridge.h"
 #include "common/Settings.h"
 #include "deskflow/ClientApp.h"
 #include "deskflow/Clipboard.h"
@@ -34,8 +35,12 @@
 #include "platform/OSXScreenSaver.h"
 
 #include <AppKit/NSEvent.h>
+#include <AppKit/NSPasteboard.h>
+#include <ApplicationServices/ApplicationServices.h>
 #include <AvailabilityMacros.h>
 #include <IOKit/hidsystem/event_status_driver.h>
+#include <QJsonObject>
+#include <chrono>
 #include <dispatch/dispatch.h>
 #include <libproc.h>
 #include <mach-o/dyld.h>
@@ -60,6 +65,37 @@ enum
 };
 
 static const double kCarbonLoopWaitTimeout = 10.0;
+static constexpr int64_t kFilePasteReplayTag = 0x44534650;
+
+static pid_t frontmostApplicationPid()
+{
+  ProcessSerialNumber front{};
+  pid_t pid = 0;
+  if (GetFrontProcess(&front) == noErr)
+    GetProcessPID(&front, &pid);
+  return pid;
+}
+
+static bool hasNativeFileClipboard()
+{
+  @autoreleasepool {
+    return [[NSPasteboard generalPasteboard] availableTypeFromArray:@[ NSPasteboardTypeFileURL ]] != nil;
+  }
+}
+
+static CFTypeRef copyFocusedPasteTarget(pid_t pid, bool window)
+{
+  if (!pid)
+    return nullptr;
+  AXUIElementRef application = AXUIElementCreateApplication(pid);
+  AXUIElementSetMessagingTimeout(application, 0.1f);
+  CFTypeRef focused = nullptr;
+  const AXError error = AXUIElementCopyAttributeValue(
+      application, window ? kAXFocusedWindowAttribute : kAXFocusedUIElementAttribute, &focused
+  );
+  CFRelease(application);
+  return error == kAXErrorSuccess ? focused : nullptr;
+}
 
 // Synthetic mouse button and drag events require event numbers on macOS 27 and later.
 static inline bool needsEventNumber()
@@ -697,6 +733,11 @@ void OSXComputer::enable()
   m_events->addHandler(EventTypes::Timer, m_axTimer, [this](const auto &) { checkAXPermissions(); });
 
   if (m_isPrimary) {
+    m_filePasteTimer = m_events->newTimer(0.05, nullptr);
+    m_events->addHandler(EventTypes::Timer, m_filePasteTimer, [this](const auto &) { pollLocalFilePaste(); });
+  }
+
+  if (m_isPrimary) {
     // FIXME -- start watching jump zones
 
     // kCGEventTapOptionDefault = 0x00000000 (Missing in 10.4, so specified literally)
@@ -748,6 +789,7 @@ void OSXComputer::enable()
 
 void OSXComputer::disable()
 {
+  finishLocalFilePaste(false, "computer disabled");
   showCursor();
 
   // FIXME -- stop watching jump zones, stop capturing input
@@ -784,6 +826,12 @@ void OSXComputer::disable()
     m_axTimer = nullptr;
   }
 
+  if (m_filePasteTimer != nullptr) {
+    m_events->removeHandler(EventTypes::Timer, m_filePasteTimer);
+    m_events->deleteTimer(m_filePasteTimer);
+    m_filePasteTimer = nullptr;
+  }
+
   m_isOnComputer = m_isPrimary;
 }
 
@@ -818,6 +866,7 @@ bool OSXComputer::canLeave()
 
 void OSXComputer::leave()
 {
+  finishLocalFilePaste(false, "left primary computer");
   hideCursor();
 
   if (m_isPrimary) {
@@ -835,14 +884,36 @@ void OSXComputer::leave()
 
 bool OSXComputer::setClipboard(ClipboardID, const IClipboard *src)
 {
-  // File payloads are handled by the GUI's TLS file channel. Do not clear the
-  // native file URLs prepared for Finder/Explorer when switching screens.
   if (src && src->open(0)) {
     const bool files = src->has(IClipboard::Format::Files);
+    const auto payload = files ? src->get(IClipboard::Format::Files) : std::string();
     src->close();
-    if (files)
-      return true;
+    if (files) {
+      if (m_isPrimary)
+        m_filePastePending.store(true);
+      if (deskflow::files::FileClipboardBridge::writeIncomingOffer(payload)) {
+        if (m_isPrimary)
+          m_filePasteOfferClipboardSequence = quint64([[NSPasteboard generalPasteboard] changeCount]);
+        return true;
+      }
+      if (m_isPrimary) {
+        m_filePastePending.store(false);
+        finishLocalFilePaste(false, "invalid file offer");
+        m_filePasteOfferClipboardSequence = 0;
+      }
+      deskflow::files::FileClipboardBridge::clearIncomingOffer();
+      deskflow::files::FileClipboardBridge::clearIncomingStatus();
+      // Old versions sent only a marker. They have no transferable offer.
+      return payload == "file-sharing-v1";
+    }
   }
+  if (m_isPrimary) {
+    m_filePastePending.store(false);
+    finishLocalFilePaste(false, "clipboard changed");
+    m_filePasteOfferClipboardSequence = 0;
+  }
+  deskflow::files::FileClipboardBridge::clearIncomingOffer();
+  deskflow::files::FileClipboardBridge::clearIncomingStatus();
   if (src != nullptr) {
     LOG_DEBUG("setting clipboard");
     Clipboard::copy(&m_pasteboard, src);
@@ -853,11 +924,177 @@ bool OSXComputer::setClipboard(ClipboardID, const IClipboard *src)
 void OSXComputer::checkClipboards()
 {
   LOG_VERBOSE("checking clipboard");
+  if (deskflow::files::FileClipboardBridge::isNativePublicationInProgress())
+    return;
+  if (m_isPrimary && m_filePastePending.load() &&
+      deskflow::files::FileClipboardBridge::isSuppressedSequence(quint64([[NSPasteboard generalPasteboard] changeCount])
+      )) {
+    QJsonObject offer;
+    QJsonObject status;
+    if (deskflow::files::FileClipboardBridge::readIncomingOffer(offer) &&
+        deskflow::files::FileClipboardBridge::readIncomingStatus(status) &&
+        status.value("state") == QLatin1String("ready") && status.value("sequence") == offer.value("sequence") &&
+        status.value("key") == offer.value("key") &&
+        quint64([[NSPasteboard generalPasteboard] changeCount]) != m_filePasteOfferClipboardSequence &&
+        hasNativeFileClipboard()) {
+      m_filePastePending.store(false);
+      m_filePasteOfferClipboardSequence = 0;
+    }
+  }
   if (m_pasteboard.synchronize()) {
+    const auto sequence = quint64([[NSPasteboard generalPasteboard] changeCount]);
+    if (deskflow::files::FileClipboardBridge::isSuppressedSequence(sequence))
+      return;
+    if (m_isPrimary) {
+      m_filePastePending.store(false);
+      finishLocalFilePaste(false, "local clipboard changed");
+      m_filePasteOfferClipboardSequence = 0;
+    }
+    deskflow::files::FileClipboardBridge::clearIncomingOffer();
+    deskflow::files::FileClipboardBridge::clearIncomingStatus();
     LOG_DEBUG("clipboard changed");
     sendClipboardEvent(EventTypes::ClipboardGrabbed, kClipboardClipboard);
     sendClipboardEvent(EventTypes::ClipboardGrabbed, kClipboardSelection);
   }
+}
+
+void OSXComputer::pollLocalFilePaste()
+{
+  if (!m_filePasteRequested.load())
+    return;
+  if (!m_isPrimary || !m_isOnComputer) {
+    finishLocalFilePaste(false, "left primary computer");
+    return;
+  }
+
+  QJsonObject offer;
+  QJsonObject status;
+  if (!deskflow::files::FileClipboardBridge::readIncomingOffer(offer)) {
+    finishLocalFilePaste(false, "file offer is unavailable");
+    return;
+  }
+  if (m_filePasteActive && (offer.value("sequence").toString().toStdString() != m_filePasteSequence ||
+                            offer.value("key").toString().toStdString() != m_filePasteKey)) {
+    finishLocalFilePaste(false, "file offer changed");
+    return;
+  }
+  if (!deskflow::files::FileClipboardBridge::readIncomingStatus(status) ||
+      offer.value("sequence") != status.value("sequence") || offer.value("key") != status.value("key") ||
+      status.value("state") == QLatin1String("failed")) {
+    finishLocalFilePaste(false, "file transfer failed");
+    return;
+  }
+
+  const auto now = std::chrono::steady_clock::now();
+  if (!m_filePasteActive) {
+    if (m_filePasteInteractionSerial.load() != m_filePasteStartSerial.load() || !m_filePasteTargetPid.load() ||
+        frontmostApplicationPid() != m_filePasteTargetPid.load()) {
+      finishLocalFilePaste(false, "paste destination changed");
+      return;
+    }
+    m_filePasteInitialPid = m_filePasteTargetPid.load();
+    m_filePasteFocus = copyFocusedPasteTarget(m_filePasteInitialPid, true);
+    m_filePasteFocusIsWindow = m_filePasteFocus != nullptr;
+    if (!m_filePasteFocus)
+      m_filePasteFocus = copyFocusedPasteTarget(m_filePasteInitialPid, false);
+    if (!m_filePasteFocus) {
+      finishLocalFilePaste(false, "focused paste target is unavailable");
+      return;
+    }
+    m_filePasteSequence = offer.value("sequence").toString().toStdString();
+    m_filePasteKey = offer.value("key").toString().toStdString();
+    m_filePasteInitialInteractionSerial = m_filePasteStartSerial.load();
+    m_filePasteInitialClipboardSequence = quint64([[NSPasteboard generalPasteboard] changeCount]);
+    m_filePasteDeadline = now + std::chrono::minutes(10);
+    m_filePasteNextFocusCheck = now;
+    m_filePasteActive = true;
+  }
+
+  if (now >= m_filePasteDeadline || frontmostApplicationPid() != m_filePasteInitialPid ||
+      m_filePasteInteractionSerial.load() != m_filePasteInitialInteractionSerial) {
+    finishLocalFilePaste(false, "paste destination changed or timed out");
+    return;
+  }
+
+  if (deskflow::files::FileClipboardBridge::isNativePublicationInProgress())
+    return;
+  const quint64 clipboardSequence = quint64([[NSPasteboard generalPasteboard] changeCount]);
+  const bool receivedClipboard = deskflow::files::FileClipboardBridge::isSuppressedSequence(clipboardSequence);
+  if ((clipboardSequence != m_filePasteInitialClipboardSequence ||
+       clipboardSequence != m_filePasteOfferClipboardSequence) &&
+      !receivedClipboard) {
+    finishLocalFilePaste(true, "clipboard replaced before file transfer completed");
+    return;
+  }
+
+  const bool ready = status.value("state") == QLatin1String("ready");
+  if (ready || now >= m_filePasteNextFocusCheck) {
+    CFTypeRef focus = copyFocusedPasteTarget(m_filePasteInitialPid, m_filePasteFocusIsWindow);
+    const bool sameFocus = focus && CFEqual(focus, m_filePasteFocus);
+    if (focus)
+      CFRelease(focus);
+    if (!sameFocus) {
+      finishLocalFilePaste(false, "focused paste target changed");
+      return;
+    }
+    m_filePasteNextFocusCheck = now + std::chrono::milliseconds(500);
+  }
+  if (!ready || m_filePasteSuppressV.load())
+    return;
+  if (!receivedClipboard || clipboardSequence == m_filePasteOfferClipboardSequence || !hasNativeFileClipboard()) {
+    finishLocalFilePaste(false, "file clipboard was not published");
+    return;
+  }
+
+  CGEventSourceRef source = CGEventSourceCreate(kCGEventSourceStateHIDSystemState);
+  if (!source) {
+    finishLocalFilePaste(true, "could not create synthetic paste input");
+    return;
+  }
+  const bool commandHeld = (CGEventSourceFlagsState(kCGEventSourceStateHIDSystemState) & kCGEventFlagMaskCommand) != 0;
+  const auto postKey = [&](CGKeyCode key, bool down, CGEventFlags flags) {
+    CGEventRef keyEvent = CGEventCreateKeyboardEvent(source, key, down);
+    if (!keyEvent)
+      return false;
+    CGEventSetFlags(keyEvent, flags);
+    CGEventSetIntegerValueField(keyEvent, kCGEventSourceUserData, kFilePasteReplayTag);
+    CGEventPost(kCGHIDEventTap, keyEvent);
+    CFRelease(keyEvent);
+    return true;
+  };
+  bool posted = true;
+  if (!commandHeld)
+    posted = postKey(kVK_Command, true, kCGEventFlagMaskCommand);
+  posted = postKey(kVK_ANSI_V, true, kCGEventFlagMaskCommand) && posted;
+  posted = postKey(kVK_ANSI_V, false, kCGEventFlagMaskCommand) && posted;
+  if (!commandHeld)
+    posted = postKey(kVK_Command, false, 0) && posted;
+  if (!posted) {
+    postKey(kVK_ANSI_V, false, kCGEventFlagMaskCommand);
+    if (!commandHeld)
+      postKey(kVK_Command, false, 0);
+  }
+  CFRelease(source);
+  finishLocalFilePaste(true, posted ? nullptr : "could not synthesize paste input");
+}
+
+void OSXComputer::finishLocalFilePaste(bool disarm, const char *reason)
+{
+  if (reason && (m_filePasteActive || m_filePasteRequested.load()))
+    LOG_INFO("deferred local file paste canceled: %s", reason);
+  m_filePasteActive = false;
+  m_filePasteRequested.store(false);
+  if (disarm) {
+    m_filePastePending.store(false);
+    m_filePasteOfferClipboardSequence = 0;
+  }
+  if (m_filePasteFocus) {
+    CFRelease(m_filePasteFocus);
+    m_filePasteFocus = nullptr;
+  }
+  m_filePasteSequence.clear();
+  m_filePasteKey.clear();
+  m_filePasteInitialPid = 0;
 }
 
 void OSXComputer::openScreensaver(bool notify)
@@ -1685,6 +1922,39 @@ OSXComputer::handleCGInputEventSecondary(CGEventTapProxy proxy, CGEventType type
 CGEventRef OSXComputer::handleCGInputEvent(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *refcon)
 {
   OSXComputer *computer = (OSXComputer *)refcon;
+
+  if (event && CGEventGetIntegerValueField(event, kCGEventSourceUserData) == kFilePasteReplayTag)
+    return event;
+
+  if (computer->m_isPrimary) {
+    const bool keyDown = type == kCGEventKeyDown;
+    const bool keyUp = type == kCGEventKeyUp;
+    if (keyDown || keyUp) {
+      const auto key = CGKeyCode(CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode));
+      if (key == kVK_ANSI_V && keyUp && computer->m_filePasteSuppressV.exchange(false))
+        return nullptr;
+      if (key == kVK_ANSI_V && keyDown && computer->m_filePasteSuppressV.load())
+        return nullptr;
+      if (key == kVK_ANSI_V && keyDown && computer->m_isOnComputer && computer->m_filePastePending.load()) {
+        const auto flags = CGEventGetFlags(event);
+        const auto required = kCGEventFlagMaskCommand;
+        const auto excluded = kCGEventFlagMaskShift | kCGEventFlagMaskAlternate | kCGEventFlagMaskControl;
+        if ((flags & required) != 0 && (flags & excluded) == 0) {
+          if (!computer->m_filePasteRequested.exchange(true)) {
+            computer->m_filePasteStartSerial.store(computer->m_filePasteInteractionSerial.load());
+            computer->m_filePasteTargetPid.store(frontmostApplicationPid());
+          }
+          computer->m_filePasteSuppressV.store(true);
+          return nullptr;
+        }
+      }
+      if (keyDown && computer->m_filePasteRequested.load())
+        computer->m_filePasteInteractionSerial.fetch_add(1);
+    } else if (computer->m_filePasteRequested.load() &&
+               (type == kCGEventLeftMouseDown || type == kCGEventRightMouseDown || type == kCGEventOtherMouseDown)) {
+      computer->m_filePasteInteractionSerial.fetch_add(1);
+    }
+  }
 
   switch (type) {
   case kCGEventLeftMouseDown:

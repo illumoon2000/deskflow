@@ -3,60 +3,58 @@
  * SPDX-License-Identifier: GPL-2.0-only WITH LicenseRef-OpenSSL-Exception
  */
 #pragma once
+
 #include "FileSharingSettings.h"
 #include "FileTransferService.h"
 #include <QDialog>
+#include <QJsonObject>
+#include <QPointer>
 #include <QTimer>
-class QCheckBox;
-class QLineEdit;
-class QSpinBox;
+
 class QLabel;
+class QLineEdit;
 class QPushButton;
+class QSpinBox;
 class QTreeWidget;
+
 namespace deskflow::gui::files {
 class FileSharingDialog : public QDialog
 {
   Q_OBJECT
 public:
-  explicit FileSharingDialog(QWidget *parent = nullptr, const QString &settingsPath = {});
+  explicit FileSharingDialog(QWidget *parent = nullptr, const QString &settingsPath = {}, bool autoStart = true);
   ~FileSharingDialog() override;
 Q_SIGNALS:
   void notification(const QString &message);
 
-protected:
-  void dragEnterEvent(QDragEnterEvent *event) override;
-  void dropEvent(QDropEvent *event) override;
-
 private:
-  void apply();
-  void sendFiles(const QStringList &paths);
+  void start();
+  void refreshEndpoint();
+  void poll();
+  void beginPull(const QJsonObject &offer);
+  void tryNextAddress();
+  void finishPull(bool success, const QString &message);
+  void setOfferStatus(const char *state);
   void watch(FileTransferSession *session, bool outgoing);
-  void incoming(FileTransferSession *session);
-  void pollClipboard();
-  void copyReceived();
-  void showError(const QString &error);
+  void showError(const QString &message);
   QString m_settingsPath;
   FileSharingSettings m_settings;
   FileTransferService m_service;
-  QCheckBox *m_enabled;
-  QCheckBox *m_clipboard;
-  QCheckBox *m_autoAccept;
-  QLineEdit *m_host;
-  QLineEdit *m_peer;
-  QLineEdit *m_folder;
-  QSpinBox *m_port;
-  QSpinBox *m_limit;
-  QLabel *m_status;
-  QTreeWidget *m_transfers;
-  QPushButton *m_copyCode;
-  QPushButton *m_send;
-  QPushButton *m_sendFolder;
-  QPushButton *m_copyReceived;
-  QPushButton *m_openReceived;
   QTimer m_poll;
+  QTimer m_endpointRefresh;
+  QPointer<FileTransferSession> m_pullSession;
+  QLabel *m_status = nullptr;
+  QLineEdit *m_folder = nullptr;
+  QSpinBox *m_limit = nullptr;
+  QTreeWidget *m_transfers = nullptr;
   quint64 m_seenClipboard = 0;
-  QStringList m_pendingFiles;
-  quint64 m_pendingSequence = 0;
+  quint64 m_clipboardBeforePull = 0;
   QStringList m_receivedFiles;
+  QJsonObject m_offer;
+  quint64 m_pullGeneration = 0;
+  int m_nextAddress = 0;
+  int m_retryCycle = 0;
+  qint64 m_statusRefreshedAt = 0;
+  bool m_started = false;
 };
 } // namespace deskflow::gui::files

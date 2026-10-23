@@ -9,11 +9,23 @@
 
 #include "arch/ArchException.h"
 #include "base/Log.h"
+#include "common/FileClipboardBridge.h"
 #include "platform/OSXClipboardBMPConverter.h"
 #include "platform/OSXClipboardHTMLConverter.h"
 #include "platform/OSXClipboardTextConverter.h"
 #include "platform/OSXClipboardUTF16Converter.h"
 #include "platform/OSXClipboardUTF8Converter.h"
+
+#import <AppKit/AppKit.h>
+
+namespace {
+quint64 nativeClipboardSequence()
+{
+  @autoreleasepool {
+    return quint64([[NSPasteboard generalPasteboard] changeCount]);
+  }
+}
+} // namespace
 
 //
 // OSXClipboard
@@ -136,12 +148,23 @@ bool OSXClipboard::has(Format format) const
   if (m_pboard == nullptr)
     return false;
 
+  if (deskflow::files::FileClipboardBridge::isNativePublicationInProgress() ||
+      deskflow::files::FileClipboardBridge::isSuppressedSequence(nativeClipboardSequence()))
+    return false;
+  QJsonObject incoming;
+  if (deskflow::files::FileClipboardBridge::readIncomingOffer(incoming))
+    return false;
+
   PasteboardItemID item;
-  PasteboardGetItemIdentifier(m_pboard, (CFIndex)1, &item);
-  if (format == IClipboard::Format::Files) {
-    PasteboardFlavorFlags flags;
-    return PasteboardGetItemFlavorFlags(m_pboard, item, CFSTR("public.file-url"), &flags) == noErr;
-  }
+  if (PasteboardGetItemIdentifier(m_pboard, (CFIndex)1, &item) != noErr)
+    return false;
+  PasteboardFlavorFlags fileFlags;
+  const bool nativeFiles = PasteboardGetItemFlavorFlags(m_pboard, item, CFSTR("public.file-url"), &fileFlags) == noErr;
+  if (nativeFiles)
+    return format == IClipboard::Format::Files && nativeClipboardSequence() &&
+           deskflow::files::FileClipboardBridge::sourceEndpointReady();
+  if (format == IClipboard::Format::Files)
+    return false;
 
   for (ConverterList::const_iterator index = m_converters.begin(); index != m_converters.end(); ++index) {
     IOSXClipboardConverter *converter = *index;
@@ -163,7 +186,8 @@ bool OSXClipboard::has(Format format) const
 std::string OSXClipboard::get(Format format) const
 {
   if (format == IClipboard::Format::Files)
-    return "file-sharing-v1";
+    return has(format) ? deskflow::files::FileClipboardBridge::clipboardPayload(nativeClipboardSequence())
+                       : std::string();
   CFStringRef type;
   PasteboardItemID item;
   std::string result;
