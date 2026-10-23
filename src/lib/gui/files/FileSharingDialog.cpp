@@ -118,8 +118,16 @@ FileSharingDialog::FileSharingDialog(QWidget *parent, const QString &settingsPat
     QDesktopServices::openUrl(QUrl::fromLocalFile(m_settings.receiveDirectory));
   });
   connect(cancel, &QPushButton::clicked, this, [this] {
-    if (m_pullSession)
-      m_pullSession->cancel();
+    if (m_offer.isEmpty())
+      return;
+    // Invalidate callbacks and pending address retries before cancel() emits
+    // finished(false), otherwise the failure handler starts another pull.
+    ++m_pullGeneration;
+    auto *session = m_pullSession.data();
+    m_pullSession.clear();
+    if (session)
+      session->cancel();
+    finishPull(false, tr("File transfer cancelled."));
   });
   connect(close, &QPushButton::clicked, this, &QDialog::hide);
   connect(&m_service, &FileTransferService::started, this, &FileSharingDialog::watch);
@@ -140,8 +148,12 @@ FileSharingDialog::FileSharingDialog(QWidget *parent, const QString &settingsPat
       deskflow::files::FileClipboardBridge::clearIncomingOffer();
       deskflow::files::FileClipboardBridge::clearIncomingStatus();
       m_service.clearPullOffer();
-      if (m_pullSession)
-        m_pullSession->cancel();
+      ++m_pullGeneration;
+      m_offer = {};
+      auto *session = m_pullSession.data();
+      m_pullSession.clear();
+      if (session)
+        session->cancel();
     }
   });
   m_seenClipboard = clipboardSequence();
@@ -270,10 +282,15 @@ void FileSharingDialog::poll()
   }
   QJsonObject source;
   if (deskflow::files::FileClipboardBridge::readSourceOffer(source) &&
-      source.value("sequence").toString() == QString::number(sequence) && !copiedFiles().isEmpty())
-    m_service.setPullOffer(source.value("key").toString().toLatin1(), sequence);
-  else
+      source.value("sequence").toString() == QString::number(sequence)) {
+    if (m_sourceFilesSequence != sequence || !m_sourceHasFiles) {
+      m_sourceFilesSequence = sequence;
+      m_sourceHasFiles = !copiedFiles().isEmpty();
+    }
+    m_service.setPullOffer(m_sourceHasFiles ? source.value("key").toString().toLatin1() : QByteArray{}, sequence);
+  } else {
     m_service.setPullOffer({}, 0);
+  }
 
   QJsonObject incoming, status;
   const bool pending = deskflow::files::FileClipboardBridge::readIncomingOffer(incoming) &&
@@ -304,7 +321,7 @@ void FileSharingDialog::beginPull(const QJsonObject &offer)
 
 void FileSharingDialog::tryNextAddress()
 {
-  if (m_offer.isEmpty())
+  if (m_offer.isEmpty() || !TlsUtility::isEnabled() || !Settings::value(Settings::Security::CheckPeers).toBool())
     return;
   const auto generation = m_pullGeneration;
   const auto addresses = m_offer.value("addresses").toArray();
@@ -421,6 +438,8 @@ void FileSharingDialog::finishPull(bool success, const QString &message)
   m_status->setText(message);
   if (!success)
     Q_EMIT notification(message);
+  if (!success)
+    m_offer = {};
 }
 
 void FileSharingDialog::watch(FileTransferSession *session, bool outgoing)

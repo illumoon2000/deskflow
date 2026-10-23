@@ -1507,6 +1507,10 @@ L&apos;abilitazione di questa impostazione disabiliterà l&apos;interfaccia graf
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>File transfer cancelled.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>File sharing preview</source>
         <translation type="unfinished"></translation>
     </message>

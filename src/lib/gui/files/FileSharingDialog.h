@@ -48,6 +48,8 @@ private:
   QSpinBox *m_limit = nullptr;
   QTreeWidget *m_transfers = nullptr;
   quint64 m_seenClipboard = 0;
+  quint64 m_sourceFilesSequence = 0;
+  bool m_sourceHasFiles = false;
   quint64 m_clipboardBeforePull = 0;
   QStringList m_receivedFiles;
   QJsonObject m_offer;

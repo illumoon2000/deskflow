@@ -1506,6 +1506,10 @@ Enabling this setting will disable the server config GUI.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>File transfer cancelled.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>File sharing preview</source>
         <translation type="unfinished"></translation>
     </message>

@@ -522,6 +522,13 @@ private Q_SLOTS:
     QVERIFY(FileClipboardBridge::readIncomingStatus(status));
     QCOMPARE(status.value("state").toString(), QStringLiteral("ready"));
 
+    status.insert("state", QStringLiteral("failed"));
+    status.insert("updatedMs", QDateTime::currentMSecsSinceEpoch());
+    QVERIFY(FileClipboardBridge::writeIncomingStatus(status));
+    QVERIFY(FileClipboardBridge::writeIncomingOffer(payload));
+    QVERIFY(FileClipboardBridge::readIncomingStatus(status));
+    QCOMPARE(status.value("state").toString(), QStringLiteral("pending"));
+
     FileClipboardBridge::clearIncomingOffer();
     FileClipboardBridge::clearIncomingStatus();
     FileClipboardBridge::clearSourceOffer();

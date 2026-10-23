@@ -504,7 +504,9 @@ bool FileClipboardBridge::writeIncomingOffer(const std::string_view payload)
                     previous.value("key") == offer.value("key");
   if (!writeJson(incomingOfferPath(), offer, nullptr))
     return false;
-  if (same && previous.value("state") != QLatin1String("pending"))
+  // A completed download can be reused when the same clipboard is sent again.
+  // A failed download must become eligible for a new pull on the next offer.
+  if (same && previous.value("state") == QLatin1String("ready"))
     return true;
   const QJsonObject pending{
       {"version", 2},

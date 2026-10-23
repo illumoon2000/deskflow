@@ -1706,6 +1706,10 @@ The sender has this computer&apos;s pairing code.</source>
         <translation>파일 공유 설정을 저장했습니다.</translation>
     </message>
     <message>
+        <source>File transfer cancelled.</source>
+        <translation>파일 전송이 취소되었습니다.</translation>
+    </message>
+    <message>
         <source>File sharing preview</source>
         <translation>파일 공유 미리보기</translation>
     </message>
