@@ -1539,8 +1539,8 @@ void MSWindowsComputer::pollLocalFilePaste()
   };
   if (!ctrlHeld)
     appendKey(VK_CONTROL, 0);
-  appendKey(VK_V, 0);
-  appendKey(VK_V, KEYEVENTF_KEYUP);
+  appendKey('V', 0);
+  appendKey('V', KEYEVENTF_KEYUP);
   if (!ctrlHeld)
     appendKey(VK_CONTROL, KEYEVENTF_KEYUP);
 
@@ -1551,7 +1551,7 @@ void MSWindowsComputer::pollLocalFilePaste()
     );
     INPUT release[2]{};
     release[0].type = INPUT_KEYBOARD;
-    release[0].ki.wVk = VK_V;
+    release[0].ki.wVk = 'V';
     release[0].ki.dwFlags = KEYEVENTF_KEYUP;
     release[0].ki.dwExtraInfo = MSWindowsHook::kFilePasteReplayTag;
     release[1].type = INPUT_KEYBOARD;

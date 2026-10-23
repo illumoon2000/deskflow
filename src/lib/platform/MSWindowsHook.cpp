@@ -525,13 +525,13 @@ static LRESULT CALLBACK keyboardLLHook(int code, WPARAM wParam, LPARAM lParam)
 
     if (g_isPrimary && !injected) {
       const bool up = (info->flags & LLKHF_UP) != 0;
-      if (info->vkCode == VK_V && up && g_filePasteSuppressV.exchange(false)) {
+      if (info->vkCode == 'V' && up && g_filePasteSuppressV.exchange(false)) {
         return 1;
       }
-      if (info->vkCode == VK_V && !up && g_filePasteSuppressV.load()) {
+      if (info->vkCode == 'V' && !up && g_filePasteSuppressV.load()) {
         return 1;
       }
-      if (info->vkCode == VK_V && !up && g_mode == kHOOK_WATCH_JUMP_ZONE && !g_fakeServerInput &&
+      if (info->vkCode == 'V' && !up && g_mode == kHOOK_WATCH_JUMP_ZONE && !g_fakeServerInput &&
           g_filePastePending.load() && (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0 &&
           (GetAsyncKeyState(VK_MENU) & 0x8000) == 0 && (GetAsyncKeyState(VK_SHIFT) & 0x8000) == 0 &&
           (GetAsyncKeyState(VK_LWIN) & 0x8000) == 0 && (GetAsyncKeyState(VK_RWIN) & 0x8000) == 0) {
