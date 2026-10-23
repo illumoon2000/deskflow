@@ -17,6 +17,7 @@ struct FileSharingSettings
   QString peerCode;
   QByteArray key;
   static QByteArray newKey();
+  static QString storagePath();
   static FileSharingSettings load(const QString &path);
   bool save(const QString &path, QString &error) const;
   static bool parsePeer(const QString &code, QUrl &url, QByteArray &fingerprint, QByteArray &key);

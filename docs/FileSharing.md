@@ -58,14 +58,14 @@ anyone holding that computer's pairing code. Do not forward pairing codes to oth
 Preferences and pairing secrets are in `file-sharing.json` under the per-user
 application data directory (`QStandardPaths::AppLocalDataLocation`), saved atomically
 with owner-only permissions on POSIX systems and the user profile ACL on Windows. **Reset my pairing code** invalidates old incoming pairing codes. Deleting this file
-while Deskflow is stopped resets all sharing preferences and generates a new capability. Regenerating
-Deskflow's TLS certificate invalidates old pairing codes; exchange them again.
+while Deskflow is stopped resets all sharing preferences and generates a new capability. Deskflow's **Reset all settings** also stops transfers and removes these preferences.
+Regenerating Deskflow's TLS certificate invalidates old pairing codes; exchange them again.
 
 Protocol version 1 uses TLS 1.2+, a 5-byte frame header (type + big-endian uint32
 length), bounded JSON offers and binary chunk/checksum frames. Files are streamed
 with bounded socket buffering. Unknown/out-of-order/oversized messages, failed
 checksums and excessive sizes abort the transfer. Authentication/approval and idle
-transfers time out after 120 seconds; TLS handshakes after 10 seconds.
+transfers time out after 120 seconds; incoming TLS handshakes after 10 seconds.
 
 The keyboard/mouse clipboard protocol carries a file-copy marker (without local
 paths or file contents). Updated Windows/macOS cores preserve the native file

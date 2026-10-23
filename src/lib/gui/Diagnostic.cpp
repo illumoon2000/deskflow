@@ -5,6 +5,7 @@
  */
 
 #include "Diagnostic.h"
+#include "files/FileSharingSettings.h"
 
 #include "common/Settings.h"
 
@@ -33,6 +34,7 @@ void restart()
 void clearSettings(bool enableRestart)
 {
   qDebug("clearing settings");
+  QFile::remove(files::FileSharingSettings::storagePath());
   Settings::proxy().clear();
   Settings::clearState();
 

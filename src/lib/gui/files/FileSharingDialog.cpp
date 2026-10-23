@@ -33,11 +33,7 @@
 namespace deskflow::gui::files {
 FileSharingDialog::FileSharingDialog(QWidget *parent, const QString &settingsPath)
     : QDialog(parent),
-      m_settingsPath(
-          settingsPath.isEmpty()
-              ? QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + "/file-sharing.json"
-              : settingsPath
-      ),
+      m_settingsPath(settingsPath.isEmpty() ? FileSharingSettings::storagePath() : settingsPath),
       m_settings(FileSharingSettings::load(m_settingsPath))
 {
   setWindowTitle(tr("File Sharing"));

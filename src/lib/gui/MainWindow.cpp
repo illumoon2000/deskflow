@@ -444,6 +444,11 @@ void MainWindow::clearSettings()
   qDebug() << "clearing settings";
 
   m_networkMonitor->stopMonitoring();
+  if (m_fileSharing) {
+    m_actionFileSharing->setEnabled(false);
+    delete m_fileSharing;
+    m_fileSharing = nullptr;
+  }
 
   disconnect(&m_coreProcess, nullptr, this, nullptr);
   disconnect(&m_versionChecker, nullptr, this, nullptr);

@@ -15,6 +15,10 @@
 #include <QUrlQuery>
 
 namespace deskflow::gui::files {
+QString FileSharingSettings::storagePath()
+{
+  return QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + "/file-sharing.json";
+}
 QByteArray FileSharingSettings::newKey()
 {
   QByteArray key;
