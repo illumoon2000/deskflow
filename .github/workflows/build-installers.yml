@@ -46,6 +46,42 @@ jobs:
         run: ctest --test-dir build/src/unittests --output-on-failure
       - name: Package MSI and portable ZIP
         run: cpack --config build/CPackConfig.cmake -B dist
+      - name: Verify packaged runtime
+        shell: pwsh
+        run: |
+          $archive = Get-ChildItem dist/*-portable.zip | Select-Object -First 1
+          Expand-Archive $archive.FullName -DestinationPath package-smoke
+          $gui = Get-ChildItem package-smoke -Recurse -Filter deskflow.exe | Select-Object -First 1
+          $package = $gui.Directory.FullName
+          Copy-Item build/src/unittests/gui/FileSharingTests.exe $package
+          $qtBin = Split-Path (Get-Command qmake).Source
+          Copy-Item (Join-Path $qtBin Qt6Test.dll) $package
+          $oldPath = $env:PATH
+          $env:PATH = "$package;$env:SystemRoot\System32;$env:SystemRoot"
+          $env:QT_PLUGIN_PATH = Join-Path $package plugins
+          try {
+            Push-Location $package
+            foreach ($app in @('deskflow.exe', 'deskflow-core.exe')) {
+              $process = Start-Process (Join-Path $package $app) -ArgumentList '--version' -PassThru
+              if (-not $process.WaitForExit(15000)) {
+                Stop-Process -Id $process.Id -Force
+                throw "Packaged $app did not start"
+              }
+              if ($process.ExitCode -ne 0) { throw "Packaged $app failed: $($process.ExitCode)" }
+            }
+            $test = Start-Process (Join-Path $package FileSharingTests.exe) -PassThru `
+              -RedirectStandardOutput (Join-Path $package tests.stdout.txt) `
+              -RedirectStandardError (Join-Path $package tests.stderr.txt)
+            if (-not $test.WaitForExit(90000)) {
+              Stop-Process -Id $test.Id -Force
+              throw 'Packaged file sharing tests timed out'
+            }
+            Get-Content tests.stdout.txt, tests.stderr.txt
+            if ($test.ExitCode -ne 0) { throw 'Packaged file sharing tests failed' }
+          } finally {
+            Pop-Location
+            $env:PATH = $oldPath
+          }
       - name: Upload installers
         uses: actions/upload-artifact@v4
         with:
